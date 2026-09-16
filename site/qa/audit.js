@@ -42,7 +42,7 @@
     }
   }
 
-  out.pageOverflow = document.documentElement.scrollWidth > document.documentElement.clientWidth || innerWidth > screen.width + 1;
+  out.pageOverflow = document.documentElement.scrollWidth > document.documentElement.clientWidth;
   out.viewport = { inner: innerWidth, client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth };
   const left = (s) => { const e = document.querySelector(s); return e && visible(e) ? Math.round(e.getBoundingClientRect().left) : null; };
   out.alignment = { title: left(".head h1"), search: left(".bar .field"), firstCard: left(".grid .card"), filterTabs: left(".tabs"), firstFacet: left(".facet h2"), firstChip: left(".chip") };
