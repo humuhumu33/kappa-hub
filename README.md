@@ -7,6 +7,12 @@ A federated, self-verifying equivalent of the Hugging Face Hub, built on
 Status: **design phase**. See [docs/DESIGN.md](docs/DESIGN.md) for the architecture
 and [ROADMAP.md](ROADMAP.md) for the build plan.
 
+**Model index (live):** [humuhumu33.github.io/kappa-hub](https://humuhumu33.github.io/kappa-hub/)
+lists the top trending Hugging Face models with the content address of every file,
+from [hologram-api](https://github.com/humuhumu33/hologram-api). Source in [`site/`](site/);
+it rebuilds daily. Local preview: `node site/scripts/data.mjs && BASE=/ node site/build.mjs`,
+then serve `site/dist`.
+
 ## Problem
 
 Hugging Face is a single company holding petabytes of open model weights, user

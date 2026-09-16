@@ -1,0 +1,45 @@
+name: site
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/site.yml"]
+  schedule:
+    - cron: "17 9 * * *" # after the hologram-api index run
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Data (trending Hugging Face models joined with the Hologram address index)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: node site/scripts/data.mjs --limit 500
+      - name: Build
+        run: node site/build.mjs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: https://humuhumu33.github.io/kappa-hub/
+    steps:
+      - uses: actions/deploy-pages@v4
