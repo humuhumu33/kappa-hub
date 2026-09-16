@@ -92,9 +92,26 @@ Tasks:
 Remaining for M1 polish: automate mirror sync inside the hub module
 (periodic reconcile), equivocation-degradation drill.
 
+## M-S — Kappa Swarm (P2P weight distribution via Iroh)
+
+Design: [docs/swarm-design.md](docs/swarm-design.md) (after studying
+noemaai-labs/noema-atlas). Thesis: the LargeModel chunk is the swarm unit
+(it is already BLAKE3 — the same address space as Iroh blobs), the kappa
+federation replaces the single tracker with replicated rendezvous, and
+Iroh QUIC is the wire. Discovery, swarming, and trust all ride existing
+seams; the user sees `hologram hub get <repo>` and a progress bar.
+
+| Phase | Deliverable | Acceptance |
+|---|---|---|
+| M-S1 | Swarm transport behind the seams: `hub swarm serve/get`, direct BlobTicket round-trip | Two daemons exchange a multi-chunk model P2P; byte-identical; zero bytes over HTTP |
+| M-S2 | Federated tracker: signed provider announcements as kappa edges/tags, TTL, re-announce, reverse-edge lookup | A leecher discovers a seeder via a node that never saw the seeder directly |
+| M-S3 | Parallel chunk fetcher: work-stealing across chunks and peers, failure budgets, resume | N-peer fetch ≥ max single-peer throughput and ≥ 80% of aggregate |
+| M-S4 | One-command UX: `hub get` / `hub share`, `kappahub:` links, license intent gating | New machine to running model in one command, no flags |
+
 ## M2 — Provenance
 
-Goal: lineage and claims are queryable signed graph data.
+Goal: lineage and claims are queryable signed graph data. The swarm's
+provider identities and license claims consume this layer.
 
 Tasks:
 
