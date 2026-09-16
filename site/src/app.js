@@ -147,6 +147,13 @@ function model() {
   const button = $("[data-verify]"), out = $("#verdict");
   const id = button.dataset.verify, pinned = button.dataset.manifest;
   const glyph = [...document.querySelectorAll("#glyph .cell")];
+  const sources = JSON.parse($("#sources")?.textContent || "[]");
+  const mark = (kind, state) => {
+    const li = document.querySelector(`.sources li[data-source="${kind}"]`);
+    if (!li) return;
+    li.dataset.state = state;
+    if (state === "busy") B.play(li);
+  };
   const pinnedBytes = B.hexToBytes(pinned.split(":")[1]);
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const wait = (ms) => new Promise((r) => setTimeout(r, calm ? 0 : ms));
@@ -178,6 +185,7 @@ function model() {
     out.className = "verdict";
     out.textContent = "Checking the bytes in your browser.";
     for (const svg of glyph) svg.setAttribute("class", "cell");
+    for (const s of sources) mark(s.kind, "");
     searching = true;
     search();
     const started = performance.now();
@@ -186,16 +194,29 @@ function model() {
       const api = await import("https://humuhumu33.github.io/hologram-api/hologram.js");
       const doc = await api.resolve(id, { manifest: pinned });
       received = B.hexToBytes(doc.manifest.split(":")[1]);
-      const small = doc.files.filter((f) => !f.weights && f.size && f.size < 4e6).sort((a, b) => a.size - b.size).pop();
-      let fileLine = "";
-      if (small) {
-        await api.fetchVerified(small.url, small.address);
-        fileLine = ` and ${small.path}`;
-      }
+      // The expected address comes from the index; each source only supplies bytes.
+      const file = doc.files.find((f) => f.path === button.dataset.probe);
+      const results = await Promise.all(sources.map(async (s) => {
+        mark(s.kind, "busy");
+        if (!file) { mark(s.kind, "ok"); return { s, ok: true }; }
+        const url = s.resolve ? s.resolve + file.path.split("/").map(encodeURIComponent).join("/") : file.url;
+        try { await api.fetchVerified(url, file.address); mark(s.kind, "ok"); return { s, ok: true }; }
+        catch (e) { mark(s.kind, "bad"); return { s, ok: false, mismatch: e.code === "ADDRESS_MISMATCH" }; }
+      }));
       const ms = Math.round(performance.now() - started);
       await lock(received);
-      out.className = "verdict ok";
-      out.textContent = `Verified in ${ms} ms. The manifest of ${doc.files.length} files${fileLine} match their addresses.`;
+      const good = results.filter((r) => r.ok).map((r) => r.s.name), bad = results.filter((r) => !r.ok);
+      const list = (names) => (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0]);
+      if (bad.some((r) => r.mismatch)) {
+        out.className = "verdict bad";
+        out.textContent = `${list(bad.filter((r) => r.mismatch).map((r) => r.s.name))} served different bytes. Do not use that copy.`;
+      } else if (bad.length) {
+        out.className = good.length ? "verdict ok" : "verdict bad";
+        out.textContent = good.length ? `Verified in ${ms} ms from ${list(good)}. ${list(bad.map((r) => r.s.name))} could not be reached.` : "No source could be reached.";
+      } else {
+        out.className = "verdict ok";
+        out.textContent = good.length > 1 ? `Verified in ${ms} ms. Identical bytes from ${list(good)}.` : `Verified in ${ms} ms from ${good[0]}.`;
+      }
     } catch (error) {
       await lock(received);
       out.className = "verdict bad";

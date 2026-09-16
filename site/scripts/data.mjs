@@ -105,6 +105,9 @@ async function main() {
   const index = await get(`${API}/v1/index.json`);
   if (!index?.models) throw new Error(`no index at ${API}`);
   const indexed = new Map(index.models.map((m) => [m.name, m]));
+  const sourceIndex = (await get(`${API}/v1/sources/index.json`))?.models || {};
+  // A source counts for a model only when every weight file there is byte identical (every file, if none are weights).
+  const complete = (s) => (s.weights ? s.weights_identical === s.weights : s.identical === s.files);
 
   await rm(join(DATA, "files"), { recursive: true, force: true });
   await mkdir(AVATARS, { recursive: true });
@@ -133,14 +136,21 @@ async function main() {
       state: hit ? "addressed" : index.skipped?.[m.id] ? "skipped" : "pending",
     };
     if (m.gated) row.state = "skipped";
+    row.sources = hit ? null : [];
     if (hit) {
       const doc = await get(`${API}/v1/huggingface.co/${m.id}/latest.json`);
       Object.assign(row, { revision: hit.revision, manifest: hit.manifest, files: hit.files, weightBytes: hit.weight_bytes });
+      const summary = sourceIndex[m.id] || [];
+      const detail = summary.length > 1 ? await get(`${API}/v1/sources/huggingface.co/${m.id}.json`) : null;
+      const sources = detail && detail.revision === hit.revision
+        ? detail.sources.filter(complete).map((s) => ({ kind: s.kind, name: s.name, page: s.page, resolve: s.resolve || null, missing: s.missing || [] }))
+        : [{ kind: "huggingface.co", name: "Hugging Face", page: `https://huggingface.co/${m.id}`, resolve: null, missing: [] }];
+      row.sources = sources.map((s) => s.name);
       if (doc) {
         const file = join(DATA, "files", org, `${name}.json`);
         await mkdir(dirname(file), { recursive: true });
-        await writeFile(file, JSON.stringify({ revision: doc.revision, manifest: doc.manifest,
-          files: doc.files.map((f) => [f.path, f.size, f.address, f.weights ? 1 : 0]) }));
+        await writeFile(file, JSON.stringify({ revision: doc.revision, manifest: doc.manifest, sources,
+          files: doc.files.map((f) => [f.path, f.size, f.address, f.weights ? 1 : 0, f.url]) }));
       }
     }
     return row;

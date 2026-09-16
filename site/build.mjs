@@ -119,9 +119,26 @@ const browse = page({
 function signature(manifest) {
   const bytes = B.hexToBytes(manifest.split(":")[1]);
   return `<div class="signature" title="${R.esc(manifest)}">
-    <span class="signature-label">Manifest address, one braille cell per byte</span>
+    <span class="label">Address</span>
     <span class="bx glyph" id="glyph" aria-hidden="true"><span>${B.cells(bytes.slice(0, 16))}</span><span>${B.cells(bytes.slice(16))}</span></span>
   </div>`;
+}
+
+// Where the identical bytes live. One line per source; Verify checks every one of them.
+function sourceList(sources) {
+  return `<div class="sources">
+    <span class="label">${sources.length > 1 ? "Identical bytes on" : "Available from"}</span>
+    <ul>${sources.map((s) => `<li data-source="${R.esc(s.kind)}"><span class="state">${R.icon.seal}${B.loader("orbit")}${R.icon.check}${R.icon.close}</span><a href="${R.esc(s.page)}" target="_blank" rel="noopener">${R.esc(s.name)}${R.icon.external}</a></li>`).join("")}</ul>
+  </div>`;
+}
+
+// The file every source is asked for during Verify: small (ModelScope omits CORS on mid-size non-CDN files),
+// not weights, present on all of them.
+function probe(files) {
+  const srcs = files.sources || [];
+  return files.files
+    .filter(([path, size, , weights]) => !weights && size && size < 256e3 && srcs.every((s) => !s.missing.includes(path)))
+    .sort((a, b) => a[1] - b[1]).pop()?.[0];
 }
 
 function modelPage(m, files) {
@@ -146,7 +163,12 @@ function modelPage(m, files) {
 
   let filesPanel;
   if (files) {
-    const rows = files.files.map(([path, size, address]) => `<tr data-path="${R.esc(path)}" data-size="${size ?? 0}"><td class="path" title="${R.esc(path)}">${R.esc(path)}</td><td class="size">${R.bytes(size)}</td><td class="addr">${copy(address, R.shortAddress(address))}</td></tr>`).join("\n");
+    const srcs = files.sources || [];
+    const only = (path) => {
+      const have = srcs.filter((s) => !s.missing.includes(path));
+      return srcs.length > 1 && have.length < srcs.length ? `<span class="only">${R.esc(have.map((s) => s.name).join(", "))} only</span>` : "";
+    };
+    const rows = files.files.map(([path, size, address]) => `<tr data-path="${R.esc(path)}" data-size="${size ?? 0}"><td class="path" title="${R.esc(path)}">${R.esc(path)}${only(path)}</td><td class="size">${R.bytes(size)}</td><td class="addr">${copy(address, R.shortAddress(address))}</td></tr>`).join("\n");
     filesPanel = `<div class="section-head"><h2>Files</h2><span class="pill">${files.files.length}</span></div>
     <div class="scroll"><table id="files">
       <thead><tr><th><button type="button" data-col="path" aria-sort="ascending">Path${R.icon.chevron}</button></th><th class="size"><button type="button" data-col="size">Size${R.icon.chevron}</button></th><th>Address</th></tr></thead>
@@ -173,11 +195,12 @@ function modelPage(m, files) {
       <div class="tags">${R.tags(m, { full: true })}</div>
     </div>
     <div class="actions">
-      <a class="button" href="https://huggingface.co/${R.esc(m.id)}">Hugging Face${R.icon.external}</a>
-      ${m.manifest ? `<button type="button" class="button primary" data-verify="${R.esc(m.id)}" data-manifest="${R.esc(m.manifest)}">${R.icon.check}${B.loader("orbit")}<span>Verify</span></button>` : ""}
+      ${m.manifest && files
+        ? `<button type="button" class="button primary" data-verify="${R.esc(m.id)}" data-manifest="${R.esc(m.manifest)}" data-probe="${R.esc(probe(files) || "")}">${R.icon.check}${B.loader("orbit")}<span>Verify</span></button>`
+        : `<a class="button" href="https://huggingface.co/${R.esc(m.id)}" target="_blank" rel="noopener">Hugging Face${R.icon.external}</a>`}
     </div>
   </div>
-  ${m.manifest ? signature(m.manifest) : ""}
+  ${m.manifest && files ? `<div class="provenance">${signature(m.manifest)}${sourceList(files.sources || [])}</div><script type="application/json" id="sources">${JSON.stringify((files.sources || []).map(({ kind, name, resolve }) => ({ kind, name, resolve })))}</script>` : ""}
   <p class="verdict" id="verdict" role="status" hidden></p>
 </section>
 <main class="detail">
