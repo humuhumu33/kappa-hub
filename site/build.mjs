@@ -102,6 +102,7 @@ const browse = page({
     <div class="bar">
       <label class="field search">${R.icon.search}<input id="q" type="search" placeholder="Search models" autocomplete="off" spellcheck="false" aria-label="Search models"></label>
       <button type="button" class="open-filters" id="open-filters">${R.icon.sliders}Filters</button>
+      <button type="button" class="switch" id="verified-only" role="switch" aria-checked="false"><span class="track" aria-hidden="true"><span class="thumb"></span></span>Verified only</button>
       <div class="sort">
         <button type="button" id="sort" aria-haspopup="listbox" aria-expanded="false"><span id="sort-label">Trending</span>${R.icon.chevron}</button>
         <ul role="listbox" id="sort-list" aria-label="Sort" hidden>${sortMenu}</ul>
