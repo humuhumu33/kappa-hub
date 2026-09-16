@@ -1,7 +1,7 @@
-// Static build: site/data + site/src → site/dist. No dependencies.
+// Static build: site/data + site/src + vendored brand kit → site/dist. No dependencies.
 //
 //   node site/build.mjs            base /kappa-hub/ (GitHub Pages)
-//   BASE=/ node site/build.mjs     local preview
+//   BASE=/ node site/build.mjs     local preview (Git Bash: prefix MSYS_NO_PATHCONV=1)
 
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -17,13 +17,15 @@ const REPO = "https://github.com/humuhumu33/kappa-hub";
 const INDEX = "https://github.com/humuhumu33/hologram-api";
 
 const data = JSON.parse(await readFile(join(SITE, "data", "models.json"), "utf8"));
-const models = R.withLabels(data.models);
+const models = R.prepare(data.models, data.snapshot);
 const logomark = await readFile(join(KIT, "logos", "Hologram_Logomark_White.svg"), "utf8");
 const dots = [...logomark.matchAll(/cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)"/g)].map((m) => m.slice(1).map(Number));
 if (dots.length !== 70) throw new Error(`expected 70 dots in the logomark, found ${dots.length}`);
 
-const page = ({ title, description, body }) => `<!doctype html>
-<html lang="en" data-base="${base}">
+const STYLES = ["kit/hologram-warm.css", "kit/hologram-gap-tokens.css", "tokens.css", "styles.css"];
+
+const page = ({ title, description, body, search = false }) => `<!doctype html>
+<html lang="en" class="dark" data-base="${base}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -31,20 +33,21 @@ const page = ({ title, description, body }) => `<!doctype html>
 <meta name="description" content="${R.esc(description)}">
 <meta property="og:title" content="${R.esc(title)}">
 <meta property="og:description" content="${R.esc(description)}">
-<meta name="theme-color" content="#151312">
+<meta name="color-scheme" content="dark">
 <link rel="icon" href="${base}logos/Hologram_Logomark_White.svg" type="image/svg+xml">
 <link rel="preload" href="${base}fonts/Geist-Regular.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="${base}fonts/GeistMono-Medium.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="${base}styles.css">
+<link rel="preload" href="${base}fonts/GeistMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+${STYLES.map((s) => `<link rel="stylesheet" href="${base}${s}">`).join("\n")}
 <script type="module" src="${base}app.js"></script>
 </head>
 <body>
 <div class="shell">
 <header class="top">
-  <a class="brand" href="${base}" aria-label="Hologram Hub, all models"><img src="${base}logos/Hologram_Lockup_White.svg" alt="Hologram" width="177" height="34"><span class="hub">Hub</span></a>
+  <a class="brand" href="${base}" aria-label="Hologram Hub"><img src="${base}logos/Hologram_Lockup_White.svg" alt="Hologram" width="125" height="24"><span class="hub">Hub</span></a>
+  <nav class="nav" aria-label="Main"><a href="${base}">Models</a><a href="${REPO}">GitHub</a></nav>
   <div class="top-end">
+    ${search ? `<form class="field compact top-search" action="${base}" role="search">${R.icon.search}<input type="search" name="q" placeholder="Search models" aria-label="Search models" autocomplete="off"></form>` : ""}
     <a class="status" href="${INDEX}" title="Addresses refresh daily">Index ${R.day(data.snapshot)}</a>
-    <a href="${REPO}">GitHub</a>
   </div>
 </header>
 ${body}
@@ -59,20 +62,21 @@ const r = R.query(models, initial);
 const sortMenu = R.SORTS.map(([k, label]) => `<li role="option" data-sort="${k}" aria-selected="${k === initial.sort}">${label}${R.icon.check}</li>`).join("");
 const browse = page({
   title: R.title(initial),
-  description: `The ${data.totals.models} trending models on Hugging Face, every file named by its bytes.`,
+  description: `The ${models.length} trending models on Hugging Face, every file named by its bytes.`,
   body: `<main class="browse" id="browse">
   <aside class="panel filters" aria-label="Filters">
-    <button type="button" class="close-filters" id="close-filters" aria-label="Close filters">${R.icon.close}</button>
+    <button type="button" class="control square close-filters" id="close-filters" aria-label="Close filters">${R.icon.close}</button>
     <div id="filters-body">${R.filters(r, initial)}</div>
+    <div class="sheet-footer"><button type="button" class="button primary" id="sheet-done">Show <span id="sheet-count">${r.results.length}</span> models</button></div>
   </aside>
   <section class="panel" id="results" aria-label="Models">
     <div class="head"><h1>Models</h1><span class="pill" id="total">${r.results.length}</span></div>
     <div class="bar">
-      <label class="field">${R.icon.search}<input id="q" type="search" placeholder="Search models" autocomplete="off" spellcheck="false" aria-label="Search models"></label>
+      <label class="field search">${R.icon.search}<input id="q" type="search" placeholder="Search models" autocomplete="off" spellcheck="false" aria-label="Search models"></label>
       <button type="button" class="open-filters" id="open-filters">${R.icon.sliders}Filters</button>
       <div class="sort">
         <button type="button" id="sort" aria-haspopup="listbox" aria-expanded="false"><span id="sort-label">Trending</span>${R.icon.chevron}</button>
-        <ul role="listbox" id="sort-list" aria-label="Sort" hidden style="list-style:none;margin:0">${sortMenu}</ul>
+        <ul role="listbox" id="sort-list" aria-label="Sort" hidden>${sortMenu}</ul>
       </div>
     </div>
     <div class="grid" id="grid">${R.grid(r, { base, dots })}</div>
@@ -84,19 +88,19 @@ const browse = page({
 // ---- model pages
 function modelPage(m, files) {
   const fact = (label, value) => (value ? `<div><dt>${label}</dt><dd>${value}</dd></div>` : "");
-  const copy = (text, shown) => `<button type="button" class="copy" data-copy="${R.esc(text)}" title="Copy">${R.esc(shown)}${R.icon.copy}</button>`;
+  const copy = (text, shown) => `<button type="button" class="copy" data-copy="${R.esc(text)}" aria-label="Copy ${R.esc(text)}">${R.esc(shown)}${R.icon.copy}</button>`;
   const facts = [
-    fact("Status", `<span style="color:${m.state === "addressed" ? "var(--success)" : "var(--muted-foreground)"}">${R.STATE_LABEL[m.state]}</span>`),
+    fact("Status", `<span class="${m.state === "addressed" ? "ok" : "dim"}">${R.STATE_LABEL[m.state]}</span>`),
     fact("Trending", `#${m.rank}`),
+    fact("Family", R.esc(m.family)),
     fact("Parameters", R.params(m.params)),
     fact("Context", R.context(m.context)),
-    fact("Modality", m.modality !== "Other" ? R.esc(m.modality) : null),
     fact("Architecture", R.esc(m.arch)),
-    fact("Format", m.format !== "Other" ? R.esc(m.format) : null),
+    fact("Library", R.esc(m.library)),
     fact("License", R.esc(m.license)),
-    fact("Downloads", R.count(m.downloads)),
     fact("Likes", R.count(m.likes)),
-    fact("Created", R.month(m.created)),
+    fact("Downloads", R.count(m.downloads)),
+    fact("Released", R.month(m.created)),
     m.weightBytes ? fact("Weights", R.bytes(m.weightBytes)) : "",
     m.revision ? fact("Revision", copy(m.revision, m.revision.slice(0, 12))) : "",
     m.manifest ? fact("Manifest", copy(m.manifest, R.shortAddress(m.manifest))) : "",
@@ -104,28 +108,32 @@ function modelPage(m, files) {
 
   let filesPanel;
   if (files) {
-    const rows = files.files.map(([path, size, address]) => `<tr data-path="${R.esc(path)}" data-size="${size ?? 0}">
-  <td class="path" title="${R.esc(path)}">${R.esc(path)}</td><td class="size">${R.bytes(size)}</td><td class="addr">${copy(address, R.shortAddress(address))}</td></tr>`).join("");
-    filesPanel = `<h2 class="title">Files<span class="pill">${files.files.length}</span></h2>
+    const rows = files.files.map(([path, size, address]) => `<tr data-path="${R.esc(path)}" data-size="${size ?? 0}"><td class="path" title="${R.esc(path)}">${R.esc(path)}</td><td class="size">${R.bytes(size)}</td><td class="addr">${copy(address, R.shortAddress(address))}</td></tr>`).join("\n");
+    filesPanel = `<div class="section-head"><h2>Files</h2><span class="pill">${files.files.length}</span></div>
     <div class="scroll"><table id="files">
-      <thead><tr><th><button type="button" data-col="path" aria-sort="ascending">Path</button></th><th class="size"><button type="button" data-col="size">Size</button></th><th>Address</th></tr></thead>
+      <thead><tr><th><button type="button" data-col="path" aria-sort="ascending">Path${R.icon.chevron}</button></th><th class="size"><button type="button" data-col="size">Size${R.icon.chevron}</button></th><th>Address</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   } else {
     const note = m.state === "skipped"
       ? "This model is gated on Hugging Face. Addresses are recorded for public models only."
       : "This model is queued. Every file receives its address on the next daily index.";
-    filesPanel = `<h2 class="title">Files</h2><p class="pending-note">${note}</p>`;
+    filesPanel = `<div class="section-head"><h2>Files</h2></div><p class="note">${note}</p>`;
   }
 
   return page({
     title: `${m.name} · Hologram Hub`,
     description: `${m.id}: every file of this model with the address that proves its bytes.`,
-    body: `<nav class="crumbs"><a href="${base}">${R.icon.left}Models</a></nav>
+    search: true,
+    body: `<a class="back" href="${base}">${R.icon.left}Models</a>
 <section class="panel">
   <div class="hero">
     ${R.avatar(m, base)}
-    <div class="who"><p class="org">${R.esc(m.org)}</p><h1>${R.esc(m.name)}</h1></div>
+    <div class="who">
+      <p class="org">${R.esc(m.org)}</p>
+      <h1>${R.esc(m.name)}</h1>
+      <div class="tags">${R.tags(m, { full: true })}</div>
+    </div>
     <div class="actions">
       <a class="button" href="https://huggingface.co/${R.esc(m.id)}">Hugging Face${R.icon.external}</a>
       ${m.manifest ? `<button type="button" class="button primary" data-verify="${R.esc(m.id)}" data-manifest="${R.esc(m.manifest)}">${R.icon.check}Verify</button>` : ""}
@@ -146,7 +154,8 @@ await writeFile(join(DIST, "index.html"), browse);
 await writeFile(join(DIST, "404.html"), page({
   title: "Not found · Hologram Hub",
   description: "Page not found.",
-  body: `<section class="panel" style="margin-top:var(--s6)"><div class="empty"><p>This page does not exist.</p><a class="link" href="${base}">All models</a></div></section>`,
+  search: true,
+  body: `<section class="panel browse"><div class="empty"><p>This page does not exist.</p><a class="link" href="${base}">All models</a></div></section>`,
 }));
 
 for (const m of models) {
@@ -157,10 +166,12 @@ for (const m of models) {
   await writeFile(join(dir, "index.html"), modelPage(m, files));
 }
 
-const slim = models.map(({ stateLabel, task, ...m }) => m);
+const slim = models.map(({ stateLabel, task, recency, isNew, ...m }) => m);
 await writeFile(join(DIST, "data", "models.json"), JSON.stringify({ snapshot: data.snapshot, models: slim }));
 await writeFile(join(DIST, "data", "dots.json"), JSON.stringify(dots));
-for (const f of ["app.js", "render.mjs", "styles.css"]) await cp(join(SITE, "src", f), join(DIST, f));
+for (const f of ["app.js", "render.mjs", "styles.css", "tokens.css"]) await cp(join(SITE, "src", f), join(DIST, f));
+await mkdir(join(DIST, "kit"), { recursive: true });
+for (const f of ["hologram-warm.css", "hologram-gap-tokens.css"]) await cp(join(KIT, f), join(DIST, "kit", f));
 await cp(join(KIT, "fonts"), join(DIST, "fonts"), { recursive: true });
 await cp(join(KIT, "logos"), join(DIST, "logos"), { recursive: true });
 if (existsSync(join(SITE, "public"))) await cp(join(SITE, "public"), DIST, { recursive: true });

@@ -61,6 +61,32 @@ const BUCKETS = [
   [40.5e9, "21 to 40B"], [100.5e9, "41 to 100B"], [300.5e9, "101 to 300B"], [Infinity, "Over 300B"],
 ];
 
+const LANGUAGE = new Intl.DisplayNames(["en"], { type: "language" });
+
+function languages(tags) {
+  const out = [];
+  for (const t of tags || []) {
+    if (!/^[a-z]{2}$/.test(t)) continue;
+    const name = LANGUAGE.of(t);
+    if (name && name !== t) out.push(name);
+  }
+  return out;
+}
+
+// "Qwen/Qwen3.6-35B-A3B" → "Qwen 3.6", "meta-llama/Llama-3.1-8B" → "Llama 3.1", "google/gemma-4-31B" → "Gemma 4".
+function family(id, tags) {
+  const base = (tags || []).map((t) => t.match(/^base_model:(?:[a-z_]+:)?([^/]+\/[^/]+)$/)?.[1]).find(Boolean);
+  const name = (base || id).split("/")[1];
+  const parts = name.split(/[-_ ]+/);
+  let head = parts[0].match(/^([A-Za-z]{3,}?)[vV]?(\d+(?:\.\d+)?)$/);
+  let label;
+  if (head && !/^\d+(\.\d+)?[bBmMkK]$/.test(parts[0])) label = `${head[1]} ${head[2]}`;
+  else if (/^[A-Za-z]+$/.test(parts[0]) && /^[vV]?\d+(\.\d+)?$/.test(parts[1] || "")) label = `${parts[0]} ${parts[1].replace(/^v/, "V")}`;
+  else if (/^[A-Za-z][A-Za-z0-9.]+$/.test(parts[0])) label = parts[0];
+  else return null;
+  return label[0].toUpperCase() + label.slice(1);
+}
+
 function format(m) {
   const t = m.tags || [];
   if (t.includes("gguf") || m.gguf) return "GGUF";
@@ -100,6 +126,9 @@ async function main() {
       params, bucket: params ? BUCKETS.find(([max]) => params < max)[1] : null,
       context: typeof context === "number" && context > 0 && context < 1e8 ? context : null,
       arch: m.gguf?.architecture || config?.model_type || null,
+      family: family(m.id, m.tags),
+      languages: languages(m.tags),
+      library: m.library_name || null,
       format: format(m), license,
       state: hit ? "addressed" : index.skipped?.[m.id] ? "skipped" : "pending",
     };

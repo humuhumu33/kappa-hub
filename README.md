@@ -11,7 +11,8 @@ and [ROADMAP.md](ROADMAP.md) for the build plan.
 lists the top trending Hugging Face models with the content address of every file,
 from [hologram-api](https://github.com/humuhumu33/hologram-api). Source in [`site/`](site/);
 it rebuilds daily. Local preview: `node site/scripts/data.mjs && BASE=/ node site/build.mjs`,
-then serve `site/dist`.
+then serve `site/dist`. Every color, size, space and radius comes from the Hologram brand kit
+(`node site/scripts/vendor-kit.mjs` re-vendors it; `node site/scripts/lint-tokens.mjs` enforces it).
 
 ## Problem
 

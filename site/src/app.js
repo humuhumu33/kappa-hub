@@ -12,21 +12,22 @@ async function browse() {
     fetch(`${base}data/models.json`).then((r) => r.json()),
     fetch(`${base}data/dots.json`).then((r) => r.json()),
   ]);
-  const models = R.withLabels(data.models);
+  const models = R.prepare(data.models, data.snapshot);
   let state = R.parseState(location.search);
   const filters = $("#filters-body"), grid = $("#grid"), pager = $("#pager"), total = $("#total"), q = $("#q");
-  const facetSearch = {}, openMore = new Set();
+  const facetSearch = {}, openMore = new Set(), order = {};
   q.value = state.q;
 
   function render(push) {
-    const r = R.query(models, state);
+    const r = R.query(models, state, order);
     state.page = r.page;
     const focus = document.activeElement?.dataset?.facetSearch;
-    filters.innerHTML = R.filters(r, state);
+    filters.innerHTML = R.filters(r, state, order);
     grid.innerHTML = R.grid(r, { base, dots });
     pager.innerHTML = R.pager(r, state);
     total.textContent = r.results.length.toLocaleString("en-US");
-    for (const section of filters.querySelectorAll(".facet")) clamp(section, openMore.has(section.dataset.key));
+    $("#sheet-count").textContent = total.textContent;
+    clampAll();
     for (const [key, text] of Object.entries(facetSearch)) {
       const input = filters.querySelector(`[data-facet-search="${key}"]`);
       if (input) { input.value = text; narrow(input); if (focus === key) { input.focus(); input.setSelectionRange(text.length, text.length); } }
@@ -38,13 +39,17 @@ async function browse() {
     else if (push === "replace") history.replaceState(null, "", url);
   }
 
+  function clampAll() {
+    for (const section of filters.querySelectorAll(".facet")) clamp(section, openMore.has(section.dataset.key));
+  }
+
   function clamp(section, open) {
     const chips = section.querySelector(".chips"), more = section.querySelector(".more");
     chips.classList.add("clamped");
     const hidden = [...chips.children].filter((c) => c.offsetTop - chips.offsetTop >= chips.clientHeight).length;
     if (!hidden) { chips.classList.remove("clamped"); more.hidden = true; return; }
     more.hidden = false;
-    more.textContent = open ? "Show less" : `${hidden} more`;
+    more.textContent = open ? "Show less" : `+${hidden} more`;
     if (open) chips.classList.remove("clamped");
     more.onclick = () => {
       const next = chips.classList.contains("clamped");
@@ -65,7 +70,8 @@ async function browse() {
   const change = (fn) => { fn(); state.page = 1; render("push"); };
 
   filters.addEventListener("click", (e) => {
-    const chip = e.target.closest(".chip"), tab = e.target.closest(".tab"), reset = e.target.closest("[data-reset]");
+    const chip = e.target.closest(".chip"), tab = e.target.closest(".tab"), reset = e.target.closest("[data-reset]"), sorter = e.target.closest("[data-order]");
+    if (sorter) { const k = sorter.dataset.order; order[k] = order[k] === "az" ? "count" : "az"; render(); }
     if (chip) change(() => {
       const list = new Set(state.f[chip.dataset.facet] || []);
       list.has(chip.dataset.value) ? list.delete(chip.dataset.value) : list.add(chip.dataset.value);
@@ -124,7 +130,8 @@ async function browse() {
   document.addEventListener("click", (e) => { if (!e.target.closest(".sort")) openMenu(false); });
 
   // filters as a sheet on narrow screens
-  $("#open-filters").addEventListener("click", () => document.body.classList.add("sheet"));
+  $("#open-filters").addEventListener("click", () => { document.body.classList.add("sheet"); clampAll(); });
+  $("#sheet-done").addEventListener("click", () => document.body.classList.remove("sheet"));
   $("#close-filters").addEventListener("click", () => document.body.classList.remove("sheet"));
   document.addEventListener("keydown", (e) => {
     if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); q.focus(); }

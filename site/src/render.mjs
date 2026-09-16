@@ -1,6 +1,7 @@
 // Shared by the static build (Node) and the browser. Pure functions: data in, HTML out.
 
 export const PAGE_SIZE = 42;
+const NEW_DAYS = 14;
 
 export const SORTS = [
   ["trending", "Trending"],
@@ -10,16 +11,26 @@ export const SORTS = [
   ["size", "Parameters"],
 ];
 
+export const RECENCY = [["Last 30 days", 30], ["90 days", 90], ["6 months", 183], ["1 year", 365]];
+
+// key: field on the model (arrays allowed), param: URL name.
 export const FACETS = [
-  { key: "modality", param: "modality", label: "Modality", tab: "main" },
-  { key: "bucket", param: "size", label: "Parameters", tab: "main", order: ["Under 1B", "1 to 3B", "4 to 9B", "10 to 20B", "21 to 40B", "41 to 100B", "101 to 300B", "Over 300B"] },
-  { key: "stateLabel", param: "status", label: "Status", tab: "main", order: ["Addressed", "Queued", "Gated"] },
-  { key: "format", param: "format", label: "Format", tab: "format" },
-  { key: "arch", param: "arch", label: "Architecture", tab: "arch", search: true },
-  { key: "license", param: "license", label: "License", tab: "license", search: true },
+  { key: "modality", param: "modality", label: "Modality", tab: "main", icon: "grid" },
+  { key: "bucket", param: "size", label: "Parameter count", tab: "main", icon: "tag", fixed: ["Under 1B", "1 to 3B", "4 to 9B", "10 to 20B", "21 to 40B", "41 to 100B", "101 to 300B", "Over 300B"] },
+  { key: "family", param: "family", label: "Model family", tab: "main", icon: "layers", search: true },
+  { key: "stateLabel", param: "status", label: "Status", tab: "main", icon: "seal", fixed: ["Addressed", "Queued", "Gated"] },
+  { key: "recency", param: "released", label: "Release recency", tab: "main", icon: "calendar", fixed: RECENCY.map(([l]) => l), plain: true },
+  { key: "arch", param: "arch", label: "Architecture", tab: "arch", icon: "cpu", search: true },
+  { key: "languages", param: "language", label: "Language", tab: "language", icon: "globe", search: true },
+  { key: "format", param: "format", label: "Format", tab: "format", icon: "file" },
+  { key: "library", param: "library", label: "Library", tab: "library", icon: "box", search: true },
+  { key: "license", param: "license", label: "License", tab: "license", icon: "scale", search: true },
 ];
 
-export const TABS = [["main", "Main"], ["format", "Format"], ["arch", "Architecture"], ["license", "License"]];
+export const TABS = [
+  ["main", "Main", "sliders"], ["arch", "Architecture", "cpu"], ["language", "Language", "globe"],
+  ["format", "Format", "file"], ["library", "Library", "box"], ["license", "License", "scale"],
+];
 
 export const STATE_LABEL = { addressed: "Addressed", pending: "Queued", skipped: "Gated" };
 
@@ -73,11 +84,12 @@ export const shortAddress = (a) => {
   return `${alg}:${hex.slice(0, 8)}…${hex.slice(-6)}`;
 };
 
-// Icons: 1.5px strokes on a 24 grid, sized by CSS.
-const I = (d, extra = "") => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"${extra}>${d}</svg>`;
+// Icons: 1.5 strokes on a 24 grid; size comes from CSS.
+const I = (d) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 export const icon = {
   heart: I('<path d="M19.5 12.6 12 20l-7.5-7.4A4.6 4.6 0 0 1 12 6.6a4.6 4.6 0 0 1 7.5 6Z"/>'),
   down: I('<path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/>'),
+  calendar: I('<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4m6-4v4"/>'),
   search: I('<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>'),
   chevron: I('<path d="m6 9 6 6 6-6"/>'),
   left: I('<path d="m15 6-6 6 6 6"/>'),
@@ -88,46 +100,73 @@ export const icon = {
   reset: I('<path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/>'),
   close: I('<path d="m6 6 12 12M18 6 6 18"/>'),
   external: I('<path d="M14 4h6v6m0-6-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
+  grid: I('<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'),
+  tag: I('<path d="M3 12V4h8l9 9-8 8-9-9Z"/><circle cx="7.5" cy="8" r="1.2"/>'),
+  layers: I('<path d="m12 4 9 5-9 5-9-5 9-5Z"/><path d="m3 14 9 5 9-5"/>'),
+  seal: I('<path d="M12 3 20 7v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4Z"/><path d="m9 12 2 2 4-4"/>'),
+  cpu: I('<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M10 10h4v4h-4zM9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m-3 6h3m12-6h3m-3 6h3"/>'),
+  globe: I('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>'),
+  file: I('<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/>'),
+  box: I('<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>'),
+  scale: I('<path d="M12 4v16M7 20h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0L5 7Zm14 0-3 7a3 3 0 0 0 6 0l-3-7Z"/>'),
+  sortAz: I('<path d="M4 8h9M4 12h6M4 16h3M17 5v14m-3-3 3 3 3-3"/>'),
+  sortCount: I('<path d="M4 8h3M4 12h6M4 16h9M17 5v14m-3-3 3 3 3-3"/>'),
 };
 
 // The Hologram mark's 70 dots, lit by the model's own address: same bytes, same pattern.
+// Opacity here is relative; the strip's overall strength is a CSS token.
 export function art(dots, seed, lit) {
   let h = 2166136261;
   for (const c of String(seed)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
   const rand = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1000) / 1000; };
-  const circles = dots.map(([x, y, r]) => {
-    const o = lit ? (0.03 + rand() * 0.11).toFixed(2) : "0.05";
-    return `<circle cx="${x}" cy="${y}" r="${lit ? r : 2.6}" opacity="${o}"/>`;
-  }).join("");
-  return `<svg class="art" viewBox="-104 -104 208 208" aria-hidden="true">${circles}</svg>`;
+  const circles = dots.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" opacity="${lit ? (0.3 + rand() * 0.7).toFixed(2) : "0.35"}"/>`).join("");
+  return `<svg class="art${lit ? " lit" : ""}" viewBox="-104 -104 208 208" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">${circles}</svg>`;
 }
 
-export function avatar(m, base) {
-  const letter = esc(m.org[0].toUpperCase());
+export function avatar(m, base, cls = "avatar") {
   return m.avatar
-    ? `<img class="avatar" src="${base}avatars/${esc(m.avatar)}" alt="" loading="lazy" width="55" height="55">`
-    : `<span class="avatar mono" aria-hidden="true">${letter}</span>`;
+    ? `<img class="${cls}" src="${base}avatars/${esc(m.avatar)}" alt="" loading="lazy" decoding="async">`
+    : `<span class="${cls} initials" aria-hidden="true">${esc(m.org.slice(0, 2).toUpperCase())}</span>`;
+}
+
+export function tags(m, { full = false } = {}) {
+  return [
+    full ? "" : `<span class="tag">${esc(m.org)}</span>`,
+    `<span class="tag state ${m.state}">${STATE_LABEL[m.state]}</span>`,
+    m.isNew ? `<span class="tag new">New</span>` : "",
+    m.params ? `<span class="tag">${params(m.params)}</span>` : "",
+    m.context ? `<span class="tag">${context(m.context)}</span>` : "",
+    m.modality !== "Other" && (full || m.modality !== "Text") ? `<span class="tag">${esc(m.modality)}</span>` : "",
+    full && m.format !== "Other" ? `<span class="tag">${esc(m.format)}</span>` : "",
+  ].join("");
+}
+
+export function meta(m) {
+  const parts = [`${icon.heart}${count(m.likes)}`, `${icon.down}${count(m.downloads)}`];
+  if (m.created) parts.push(`${icon.calendar}${month(m.created)}`);
+  return parts.map((p) => `<span>${p}</span>`).join('<span class="sep" aria-hidden="true">·</span>');
 }
 
 export function card(m, { base, dots }) {
-  const tags = [
-    `<span class="tag state ${m.state}">${STATE_LABEL[m.state]}</span>`,
-    m.params ? `<span class="tag">${params(m.params)}</span>` : "",
-    m.modality !== "Other" ? `<span class="tag">${esc(m.modality)}</span>` : "",
-  ].join("");
-  return `<a class="card" href="${base}models/${esc(m.id)}/">
+  return `<a class="card" href="${base}models/${esc(m.id)}/" title="${esc(m.id)}">
   ${art(dots, m.manifest || m.id, m.state === "addressed")}
-  <span class="org">${esc(m.org)}</span>
-  <span class="name">${esc(m.name)}</span>
-  <span class="row"><span class="tags">${tags}</span><span class="meta">${icon.down}${count(m.downloads)}<span class="gap"></span>${icon.heart}${count(m.likes)}</span></span>
+  <span class="tags">${tags(m)}</span>
+  <span class="title">${esc(m.name)}</span>
+  <span class="meta">${meta(m)}</span>
   ${avatar(m, base)}
 </a>`;
 }
 
 // ---- Filtering, shared so the static first page equals the hydrated page.
 
-export function withLabels(models) {
-  for (const m of models) m.stateLabel = STATE_LABEL[m.state];
+export function prepare(models, snapshot) {
+  const now = Date.parse(snapshot);
+  for (const m of models) {
+    m.stateLabel = STATE_LABEL[m.state];
+    const age = m.created ? (now - Date.parse(m.created)) / 864e5 : Infinity;
+    m.recency = RECENCY.filter(([, d]) => age <= d).map(([l]) => l);
+    m.isNew = age <= NEW_DAYS;
+  }
   return models;
 }
 
@@ -135,6 +174,7 @@ export function parseState(search) {
   const p = new URLSearchParams(search);
   const state = { q: p.get("q") || "", sort: p.get("sort") || "trending", page: Math.max(1, Number(p.get("page")) || 1), tab: p.get("tab") || "main", f: {} };
   if (!SORTS.some(([k]) => k === state.sort)) state.sort = "trending";
+  if (!TABS.some(([k]) => k === state.tab)) state.tab = "main";
   for (const f of FACETS) {
     const v = p.get(f.param);
     if (v) state.f[f.key] = v.split(",").filter(Boolean);
@@ -149,19 +189,21 @@ export function stateToSearch(state) {
   for (const f of FACETS) if (state.f[f.key]?.length) p.set(f.param, state.f[f.key].join(","));
   if (state.tab !== "main") p.set("tab", state.tab);
   if (state.page > 1) p.set("page", state.page);
-  const s = p.toString().replace(/%2C/g, ",");
+  const s = p.toString().replace(/%2C/g, ",").replace(/\+/g, "%20");
   return s ? `?${s}` : "";
 }
 
+const valuesOf = (m, key) => { const v = m[key]; return Array.isArray(v) ? v : v == null ? [] : [String(v)]; };
+
 function matches(m, state, skip) {
   if (state.q) {
-    const hay = `${m.id} ${m.arch || ""}`.toLowerCase();
+    const hay = `${m.id} ${m.arch || ""} ${m.family || ""}`.toLowerCase();
     if (!state.q.toLowerCase().split(/\s+/).every((w) => hay.includes(w))) return false;
   }
   for (const f of FACETS) {
     if (f.key === skip) continue;
     const want = state.f[f.key];
-    if (want?.length && !want.includes(String(m[f.key]))) return false;
+    if (want?.length && !valuesOf(m, f.key).some((v) => want.includes(v))) return false;
   }
   return true;
 }
@@ -174,43 +216,51 @@ const SORTERS = {
   size: (a, b) => (b.params || 0) - (a.params || 0),
 };
 
-export function query(models, state) {
+export function query(models, state, order = {}) {
   const results = models.filter((m) => matches(m, state)).sort(SORTERS[state.sort]);
   const facets = FACETS.map((f) => {
-    const counts = new Map();
+    const counts = new Map(f.fixed ? f.fixed.map((v) => [v, 0]) : []);
     for (const m of models) {
-      const v = m[f.key];
-      if (v == null || v === "Other" && f.key === "modality") continue;
-      if (!matches(m, state, f.key)) { if (!counts.has(String(v))) counts.set(String(v), 0); continue; }
-      counts.set(String(v), (counts.get(String(v)) || 0) + 1);
+      const hit = matches(m, state, f.key);
+      for (const v of valuesOf(m, f.key)) {
+        if (f.key === "modality" && v === "Other") continue;
+        counts.set(v, (counts.get(v) || 0) + (hit ? 1 : 0));
+      }
     }
-    const values = [...counts].filter(([v, n]) => n > 0 || state.f[f.key]?.includes(v));
-    values.sort(f.order ? (a, b) => f.order.indexOf(a[0]) - f.order.indexOf(b[0]) : (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    return { ...f, values };
+    const active = state.f[f.key] || [];
+    const list = [...counts].filter(([v, n]) => n > 0 || active.includes(v));
+    if (f.fixed) list.sort((a, b) => f.fixed.indexOf(a[0]) - f.fixed.indexOf(b[0]));
+    else if (order[f.key] === "az") list.sort((a, b) => a[0].localeCompare(b[0]));
+    else list.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    return { ...f, values: list };
   });
   const pages = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
   const page = Math.min(state.page, pages);
   return { results, facets, pages, page, slice: results.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) };
 }
 
-// ---- Browser panels
+// ---- Browse panels
 
-export function filters(r, state) {
-  const tabs = TABS.map(([k, label]) => `<button type="button" class="tab" role="tab" data-tab="${k}" aria-selected="${state.tab === k}">${label}</button>`).join("");
+export function filters(r, state, order = {}) {
+  const tabs = TABS.map(([k, label, ic]) => `<button type="button" class="tab" role="tab" data-tab="${k}" aria-selected="${state.tab === k}">${icon[ic]}<span>${label}</span></button>`).join("");
   const sections = r.facets.filter((f) => f.tab === state.tab).map((f) => {
     const active = state.f[f.key] || [];
     const chips = f.values.map(([v, n]) => {
       const on = active.includes(v);
-      return `<button type="button" class="chip" data-facet="${f.key}" data-value="${esc(v)}" aria-pressed="${on}">${esc(v)}<span class="n">${count(n)}</span></button>`;
+      return `<button type="button" class="chip${f.plain ? " plain" : ""}" data-facet="${f.key}" data-value="${esc(v)}" aria-pressed="${on}">${icon[f.icon]}<span class="label">${esc(v)}</span>${f.plain ? "" : `<span class="n">${count(n)}</span>`}</button>`;
     }).join("");
-    return `<section class="facet${f.search ? " searchable" : ""}" data-key="${f.key}">
-  <header><h2>${f.label}</h2><button type="button" class="reset" data-reset="${f.key}"${active.length ? "" : " hidden"}>${icon.reset}Reset</button></header>
-  ${f.search ? `<label class="field small">${icon.search}<input type="search" placeholder="Filter ${f.label.toLowerCase()}" data-facet-search="${f.key}" autocomplete="off"></label>` : ""}
+    const az = order[f.key] === "az";
+    const tools = f.search
+      ? `<div class="facet-tools"><label class="field compact">${icon.search}<input type="search" placeholder="Filter ${f.label.toLowerCase()}" data-facet-search="${f.key}" autocomplete="off" aria-label="Filter ${f.label.toLowerCase()}"></label><button type="button" class="control square" data-order="${f.key}" aria-label="${az ? "Sort by count" : "Sort A to Z"}" title="${az ? "Sort by count" : "Sort A to Z"}">${az ? icon.sortCount : icon.sortAz}</button></div>`
+      : "";
+    return `<section class="facet" data-key="${f.key}">
+  <header><h2>${f.label}</h2><button type="button" class="control reset" data-reset="${f.key}"${active.length ? "" : " disabled"}>${icon.reset}Reset</button></header>
+  ${tools}
   <div class="chips">${chips || '<p class="none">No values</p>'}</div>
-  <button type="button" class="more" hidden></button>
+  <button type="button" class="control more" hidden></button>
 </section>`;
   }).join("");
-  return `<div class="tabs" role="tablist">${tabs}</div>${sections}`;
+  return `<div class="tabs" role="tablist">${tabs}</div><div class="sections">${sections}</div>`;
 }
 
 export function grid(r, { base, dots }) {
@@ -227,9 +277,9 @@ export function pager(r, state) {
     else if (nums[nums.length - 1] !== "…") nums.push("…");
   }
   return [
-    r.page > 1 ? link(r.page - 1, icon.left, ' class="step" aria-label="Previous page"') : `<span class="step off">${icon.left}</span>`,
-    ...nums.map((p) => (p === "…" ? `<span class="dots">…</span>` : p === r.page ? `<span class="now" aria-current="page">${p}</span>` : link(p, p))),
-    r.page < r.pages ? link(r.page + 1, icon.right, ' class="step" aria-label="Next page"') : `<span class="step off">${icon.right}</span>`,
+    r.page > 1 ? link(r.page - 1, icon.left, ' aria-label="Previous page"') : `<span class="off">${icon.left}</span>`,
+    ...nums.map((p) => (p === "…" ? `<span class="gap">…</span>` : p === r.page ? `<span class="now" aria-current="page">${p}</span>` : link(p, p))),
+    r.page < r.pages ? link(r.page + 1, icon.right, ' aria-label="Next page"') : `<span class="off">${icon.right}</span>`,
   ].join("");
 }
 

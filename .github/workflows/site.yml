@@ -29,6 +29,8 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: node site/scripts/data.mjs --limit 500
+      - name: Brand kit token lint
+        run: node site/scripts/lint-tokens.mjs
       - name: Build
         run: node site/build.mjs
       - uses: actions/upload-pages-artifact@v3
