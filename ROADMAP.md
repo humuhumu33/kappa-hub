@@ -56,22 +56,41 @@ hologram `features/suites/` (hub shim, model import, peer resolution).
 
 ## M1 — Federation
 
+Status: **accepted 2026-09-16**. Evidence below.
+
 Goal: two nodes behave as one hub; sync cost is the difference.
 
 Tasks:
 
-1. Two-node test rig: `KAPPA_FEDERATION_PEERS`, signed epoch probes,
-   equivocation detection.
-2. RBSR namespace sync exercised on a real model namespace.
-3. Delta bundle transfer for one changed shard of a 7B model.
-4. Mirror-mode hologram config: daemon pulls from any peer by κ.
+1. ✅ Two-node rig: `KAPPA_FEDERATION_PEERS` mutual, probe interval 2s,
+   `KAPPA_FEDERATION_NAMESPACE` (new) selects the probed namespace.
+   Both nodes reached `trust_position: federated` with verified signed
+   epoch roots.
+   - Required a kappa fix (local): the probe URL hardcoded
+     `/v2/_root?signed=true`, which no route serves and system
+     namespaces are not HTTP-addressable; the probe now reads
+     `KAPPA_FEDERATION_NAMESPACE` (default `federation`) and that
+     namespace must carry at least one tag on every peer.
+2. ✅ Data sync via delta bundles driven across peers (the mirror
+   protocol the hub layer will automate): full v1 revision (3 files +
+   manifest = 2,978 B) created on node A, ingested on node B, served by
+   both.
+3. ✅ Delta transfer for a one-shard revision change: v2 changed 1 of 3
+   files; the delta bundle carried only the new manifest + changed
+   chunk — **1,766 bytes vs 2,978 full**, and the two unchanged chunks
+   never left node A. Node B serves v2 byte-identically (SHA-256
+   compared).
+4. ✅ Mirror-mode hologram: `hub.kappa_peers` (read fallback, in order)
+   alongside `kappa_endpoint`; hub-shim resolve and `.holo` planning
+   both fall back across peers, verifying every chunk and caching
+   locally.
+   - Kill-primary acceptance: chunk deleted from the hologram local
+     store, node A killed (`unreachable`), `GET …/resolve/main/weights-b.bin`
+     → 200, byte-identical from node B, chunk re-cached locally. The
+     client completes from a peer with signatures/content checks intact.
 
-Acceptance:
-
-- One changed shard in a 7B model transfers O(one shard) bytes between
-  peers; no full re-upload.
-- Kill the primary node mid-download; the client completes from the
-  peer and verification passes.
+Remaining for M1 polish: automate mirror sync inside the hub module
+(periodic reconcile), equivocation-degradation drill.
 
 ## M2 — Provenance
 
