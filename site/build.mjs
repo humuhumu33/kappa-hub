@@ -116,7 +116,7 @@ const browse = page({
 });
 
 // ---- model pages
-const SOURCE_COLUMNS = [["huggingface.co", "Hugging Face"], ["modelscope.cn", "ModelScope"], ["bittorrent", "BitTorrent"], ["ipfs", "IPFS"]];
+const SOURCE_COLUMNS = [["huggingface.co", "Hugging Face"], ["modelscope.cn", "ModelScope"], ["ipfs", "IPFS"], ["bittorrent", "BitTorrent"]];
 // The manifest address drawn as braille: 32 bytes, 32 cells, two rows of 16. Lossless: the dots are the bits.
 function signature(manifest) {
   const bytes = B.hexToBytes(manifest.split(":")[1]);
