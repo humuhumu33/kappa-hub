@@ -25,7 +25,7 @@
 
   const SPACE = new Set([0, 1, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64]);
   for (const el of document.querySelectorAll(".shell *")) {
-    if (!visible(el) || el.closest("svg")) continue;
+    if (!visible(el) || el.closest("svg, .bx")) continue;
     const cs = getComputedStyle(el);
     for (const prop of ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "rowGap", "columnGap"]) {
       const v = px(cs[prop]);

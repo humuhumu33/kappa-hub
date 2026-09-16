@@ -204,7 +204,8 @@ function model() {
       received = B.hexToBytes(doc.manifest.split(":")[1]);
       // The expected address comes from the index; each source only supplies bytes.
       const file = doc.files.find((f) => f.path === button.dataset.probe);
-      const results = await Promise.all(sources.map(async (s) => {
+      // Peer to peer sources are checked piece by piece by the torrent client; the browser verifies HTTP sources.
+      const results = await Promise.all(sources.filter((s) => !s.p2p).map(async (s) => {
         mark(s.kind, "busy");
         if (!file) { mark(s.kind, "ok"); return { s, ok: true }; }
         const url = s.resolve ? s.resolve + file.path.split("/").map(encodeURIComponent).join("/") : file.url;
@@ -236,6 +237,8 @@ function model() {
     }
   });
 
+  downloads();
+
   const table = $("#files");
   if (table) {
     const body = table.tBodies[0];
@@ -253,6 +256,151 @@ function model() {
       body.append(...rows);
     });
   }
+}
+
+// Every download is checked against the index address before it is kept.
+function downloads() {
+  const table = $("#files");
+  if (!table) return;
+  const box = $(".download-all"), menu = $("#dl-menu"), toggle = $("#dl-all"), progress = $("#dl-progress");
+  const MEMORY_LIMIT = 256 * 1024 * 1024;
+  const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const rowOf = (el) => el.closest("tr");
+  const name = (path) => path.split("/").pop();
+  const say = (text, tone = "") => { progress.hidden = !text; progress.className = `progress ${tone}`; progress.textContent = text; };
+
+  function save(blob, filename) {
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: filename });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  }
+
+  // Single file: small files are fetched, hashed and saved in the browser; large files and sources that do not
+  // allow browser fetches download directly (the source's own download, unchecked by this page).
+  table.addEventListener("click", async (e) => {
+    const link = e.target.closest("a[data-download]");
+    if (!link) return;
+    const row = rowOf(link), size = Number(row.dataset.size), path = row.dataset.path;
+    if (size > MEMORY_LIMIT) return;
+    e.preventDefault();
+    if (link.classList.contains("busy")) return;
+    link.classList.add("busy");
+    try {
+      const response = await fetch(link.href);
+      if (!response.ok) throw new Error(String(response.status));
+      const bytes = await response.arrayBuffer();
+      const got = `sha256:${hex(await crypto.subtle.digest("SHA-256", bytes))}`;
+      if (got !== row.dataset.address) {
+        link.classList.add("bad");
+        say(`${link.dataset.source} served different bytes for ${path}. The file was not saved.`, "bad");
+        return;
+      }
+      save(new Blob([bytes]), name(path));
+      link.classList.add("done");
+      say(`Saved ${name(path)} from ${link.dataset.source}. It matches its address.`, "ok");
+    } catch {
+      window.location.href = link.href;
+    } finally {
+      link.classList.remove("busy");
+    }
+  });
+
+  // Download all menu
+  const open = (show) => { menu.hidden = !show; toggle.setAttribute("aria-expanded", String(show)); };
+  toggle.addEventListener("click", (e) => { e.stopPropagation(); open(menu.hidden); });
+  document.addEventListener("click", (e) => { if (!menu.hidden && !e.target.closest(".download-all")) open(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") open(false); });
+  if (!window.showDirectoryPicker) for (const b of menu.querySelectorAll("[data-save]")) b.hidden = true;
+
+  const files = () => [...table.tBodies[0].rows].map((row) => ({
+    path: row.dataset.path, size: Number(row.dataset.size), address: row.dataset.address,
+    links: [...row.querySelectorAll("a[data-download]")].map((a) => ({ source: a.dataset.source, href: a.href })),
+  }));
+
+  let cancelled = false;
+  menu.addEventListener("click", async (e) => {
+    const saveButton = e.target.closest("[data-save]"), script = e.target.closest("[data-script]");
+    if (!saveButton && !script) return;
+    open(false);
+    const list = files();
+
+    if (script) {
+      const q = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
+      const lines = list.map((f) => `get ${q(f.path)} ${f.links.map((l) => q(l.href)).join(" ")}`);
+      const sums = list.map((f) => `${f.address.split(":")[1]}  ${f.path}`);
+      const text = `#!/usr/bin/env sh
+# ${box.dataset.repo} at ${box.dataset.revision}
+# Downloads every file, trying each source in turn, then checks every SHA-256 against the Hologram index.
+set -eu
+mkdir -p ${q(box.dataset.name)} && cd ${q(box.dataset.name)}
+get() { path="$1"; shift; mkdir -p "$(dirname "$path")"; for url in "$@"; do curl -fL --retry 3 -C - -o "$path" "$url" && return 0; done; echo "could not download $path" >&2; return 1; }
+${lines.join("\n")}
+cat > SHA256SUMS <<'SUMS'
+${sums.join("\n")}
+SUMS
+if command -v sha256sum >/dev/null 2>&1; then sha256sum -c SHA256SUMS; else shasum -a 256 -c SHA256SUMS; fi
+`;
+      save(new Blob([text], { type: "text/x-shellscript" }), `${box.dataset.name}-download.sh`);
+      say(`Saved ${box.dataset.name}-download.sh. Run it with sh in a terminal; it checks every file when done.`, "ok");
+      return;
+    }
+
+    // Save to a folder: stream each file to disk while hashing it; a file that does not match is removed.
+    let root;
+    try { root = await window.showDirectoryPicker({ mode: "readwrite" }); } catch { return; }
+    const primary = saveButton.dataset.save;
+    const { createSHA256 } = await import("https://humuhumu33.github.io/hologram-api/vendor/hash-wasm/index.esm.min.js");
+    const totalBytes = list.reduce((s, f) => s + f.size, 0);
+    let doneBytes = 0, done = 0, bad = 0;
+    cancelled = false;
+    const cancel = Object.assign(document.createElement("button"), { type: "button", className: "link", textContent: "Cancel" });
+    cancel.onclick = () => { cancelled = true; };
+    for (const f of list) {
+      if (cancelled) break;
+      const parts = f.path.split("/");
+      let dir = root;
+      for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part, { create: true });
+      const order = [...f.links].sort((a, b) => (a.source === primary ? -1 : b.source === primary ? 1 : 0));
+      let ok = false;
+      for (const link of order) {
+        try {
+          const response = await fetch(link.href);
+          if (!response.ok || !response.body) throw new Error(String(response.status));
+          const handle = await dir.getFileHandle(parts.at(-1), { create: true });
+          const out = await handle.createWritable();
+          const hasher = await createSHA256();
+          const reader = response.body.getReader();
+          for (;;) {
+            if (cancelled) { await reader.cancel(); break; }
+            const { value, done: end } = await reader.read();
+            if (end) break;
+            hasher.update(value);
+            await out.write(value);
+            doneBytes += value.byteLength;
+            say(`Saving ${done + 1} of ${list.length} from ${link.source}, ${formatBytes(doneBytes)} of ${formatBytes(totalBytes)}`);
+            progress.append(" ", cancel);
+          }
+          await out.close();
+          if (cancelled) break;
+          if (`sha256:${hasher.digest("hex")}` === f.address) { ok = true; break; }
+          await dir.removeEntry(parts.at(-1));
+        } catch { /* try the next source */ }
+      }
+      if (cancelled) break;
+      done++;
+      if (!ok) bad++;
+    }
+    if (cancelled) say(`Stopped after ${done} of ${list.length} files.`);
+    else if (bad) say(`Saved ${done - bad} of ${list.length} files. ${bad} could not be downloaded with matching bytes and were not kept.`, "bad");
+    else say(`Saved all ${list.length} files to ${root.name}. Every file matches its address.`, "ok");
+  });
+}
+
+function formatBytes(n) {
+  const u = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+  return `${i ? n.toFixed(1) : n} ${u[i]}`;
 }
 
 function copyButtons() {

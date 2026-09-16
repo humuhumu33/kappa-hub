@@ -143,7 +143,7 @@ async function main() {
       const summary = sourceIndex[m.id] || [];
       const detail = summary.length > 1 ? await get(`${API}/v1/sources/huggingface.co/${m.id}.json`) : null;
       const sources = detail && detail.revision === hit.revision
-        ? detail.sources.filter(complete).map((s) => ({ kind: s.kind, name: s.name, page: s.page, resolve: s.resolve || null, missing: s.missing || [] }))
+        ? detail.sources.filter(complete).map((s) => ({ kind: s.kind, name: s.name, page: s.page, resolve: s.resolve || s.gateway || null, missing: s.missing || [], p2p: !!s.p2p }))
         : [{ kind: "huggingface.co", name: "Hugging Face", page: `https://huggingface.co/${m.id}`, resolve: null, missing: [] }];
       row.sources = sources.map((s) => s.name);
       if (doc) {

@@ -116,6 +116,7 @@ const browse = page({
 });
 
 // ---- model pages
+const SOURCE_COLUMNS = [["huggingface.co", "Hugging Face"], ["modelscope.cn", "ModelScope"], ["bittorrent", "BitTorrent"], ["ipfs", "IPFS"]];
 // The manifest address drawn as braille: 32 bytes, 32 cells, two rows of 16. Lossless: the dots are the bits.
 function signature(manifest) {
   const bytes = B.hexToBytes(manifest.split(":")[1]);
@@ -129,7 +130,7 @@ function signature(manifest) {
 function sourceList(sources) {
   return `<div class="sources">
     <span class="label">${sources.length > 1 ? "Identical bytes on" : "Available from"}</span>
-    <ul>${sources.map((s) => `<li data-source="${R.esc(s.kind)}"><span class="state">${R.icon.seal}${B.loader("orbit")}${R.icon.check}${R.icon.close}</span><a href="${R.esc(s.page)}" target="_blank" rel="noopener">${R.esc(s.name)}${R.icon.external}</a></li>`).join("")}</ul>
+    <ul>${sources.map((s) => `<li data-source="${R.esc(s.kind)}"${s.p2p ? ' title="Your torrent client checks every piece as it downloads. Hugging Face seeds it, so it completes with zero peers."' : ""}><span class="state">${s.p2p ? R.icon.nodes : R.icon.seal}${B.loader("orbit")}${R.icon.check}${R.icon.close}</span><a href="${R.esc(s.page)}"${s.p2p ? " download" : ' target="_blank" rel="noopener"'}>${R.esc(s.name)}${s.p2p ? R.icon.down : R.icon.external}</a></li>`).join("")}</ul>
   </div>`;
 }
 
@@ -165,14 +166,39 @@ function modelPage(m, files) {
   let filesPanel;
   if (files) {
     const srcs = files.sources || [];
-    const only = (path) => {
-      const have = srcs.filter((s) => !s.missing.includes(path));
-      return srcs.length > 1 && have.length < srcs.length ? `<span class="only">${R.esc(have.map((s) => s.name).join(", "))} only</span>` : "";
+    const byKind = Object.fromEntries(srcs.map((s) => [s.kind, s]));
+    const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");
+    // One column per source. Green: this file is available there (a download, checked against its address).
+    // Red: not available there.
+    const cell = ([kind, name], path, size, address, hfUrl) => {
+      const s = byKind[kind];
+      if (!s || s.missing.includes(path)) {
+        return `<td class="dl"><span class="dl-no" role="img" aria-label="Not available on ${name}" title="Not available on ${name}">${R.icon.close}</span></td>`;
+      }
+      if (s.p2p) {
+        return `<td class="dl"><a class="dl-yes" href="${R.esc(s.page)}" title="Torrent with every file. Pick ${R.esc(path)} in your client" aria-label="Torrent from ${name} for ${R.esc(path)}">${R.icon.down}</a></td>`;
+      }
+      const href = kind === "huggingface.co" ? hfUrl : s.resolve + encodePath(path);
+      return `<td class="dl"><a class="dl-yes" href="${R.esc(href)}" data-download data-source="${name}" title="Download ${R.esc(path)} from ${name}, checked against its address" aria-label="Download ${R.esc(path)} from ${name}">${R.icon.down}</a></td>`;
     };
-    const rows = files.files.map(([path, size, address]) => `<tr data-path="${R.esc(path)}" data-size="${size ?? 0}"><td class="path" title="${R.esc(path)}">${R.esc(path)}${only(path)}</td><td class="size">${R.bytes(size)}</td><td class="addr">${copy(address, R.shortAddress(address))}</td></tr>`).join("\n");
-    filesPanel = `<div class="section-head"><h2>Files</h2><span class="pill">${files.files.length}</span></div>
+    const total = files.files.reduce((sum, f) => sum + (f[1] || 0), 0);
+    const rows = files.files.map(([path, size, address, , hfUrl]) => `<tr data-path="${R.esc(path)}" data-size="${size ?? 0}" data-address="${R.esc(address)}"><td class="path" title="${R.esc(path)}">${R.esc(path)}</td><td class="size">${R.bytes(size)}</td><td class="addr">${copy(address, R.shortAddress(address))}</td>${SOURCE_COLUMNS.map((c) => cell(c, path, size, address, hfUrl)).join("")}</tr>`).join("\n");
+    const http = SOURCE_COLUMNS.filter(([kind]) => byKind[kind] && !byKind[kind].p2p);
+    const torrent = byKind.bittorrent;
+    filesPanel = `<div class="section-head"><h2>Files</h2><span class="pill">${files.files.length}</span>
+      <div class="download-all" data-name="${R.esc(m.name)}" data-repo="${R.esc(m.id)}" data-revision="${R.esc(files.revision)}">
+        <button type="button" class="button" id="dl-all" aria-haspopup="menu" aria-expanded="false" aria-controls="dl-menu">${R.icon.down}Download all</button>
+        <div class="menu" id="dl-menu" role="menu" aria-label="Download all" hidden>
+          <p class="menu-note">${files.files.length} files, ${R.bytes(total)}. Every file is checked against its address.</p>
+          ${http.map(([kind, name]) => `<button type="button" role="menuitem" data-save="${name}" data-save-kind="${kind}">${R.icon.file}<span class="label">Save to a folder from ${name}</span></button>`).join("")}
+          ${torrent ? `<a role="menuitem" href="${R.esc(torrent.page)}">${R.icon.nodes}<span class="label">Torrent with every file</span></a>` : ""}
+          <button type="button" role="menuitem" data-script>${R.icon.copy}<span class="label">Download script for a terminal</span></button>
+        </div>
+      </div>
+    </div>
+    <p class="progress" id="dl-progress" role="status" hidden></p>
     <div class="scroll"><table id="files">
-      <thead><tr><th><button type="button" data-col="path" aria-sort="ascending">Path${R.icon.chevron}</button></th><th class="size"><button type="button" data-col="size">Size${R.icon.chevron}</button></th><th>Address</th></tr></thead>
+      <thead><tr><th><button type="button" data-col="path" aria-sort="ascending">Path${R.icon.chevron}</button></th><th class="size"><button type="button" data-col="size">Size${R.icon.chevron}</button></th><th>Address</th>${SOURCE_COLUMNS.map(([, name]) => `<th class="dl">${name}</th>`).join("")}</tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   } else {
@@ -201,7 +227,7 @@ function modelPage(m, files) {
         : `<a class="button" href="https://huggingface.co/${R.esc(m.id)}" target="_blank" rel="noopener">Hugging Face${R.icon.external}</a>`}
     </div>
   </div>
-  ${m.manifest && files ? `<div class="provenance">${signature(m.manifest)}${sourceList(files.sources || [])}</div><script type="application/json" id="sources">${JSON.stringify((files.sources || []).map(({ kind, name, resolve }) => ({ kind, name, resolve })))}</script>` : ""}
+  ${m.manifest && files ? `<div class="provenance">${signature(m.manifest)}${sourceList(files.sources || [])}</div><script type="application/json" id="sources">${JSON.stringify((files.sources || []).map(({ kind, name, resolve, p2p }) => ({ kind, name, resolve, p2p })))}</script>` : ""}
   <p class="verdict" id="verdict" role="status" hidden></p>
 </section>
 <main class="detail">
