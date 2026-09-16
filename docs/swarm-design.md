@@ -193,7 +193,56 @@ swarm work).
   share <repo>`; `kappahub:<manifest-κ>` links; license/intent gating;
   docs.
 
-## 7. Non-goals
+## 7. Full decentralization (Veilid assessment)
+
+Claim under assessment: "we don't need GitHub — a Veilid DHT layer lets mesh
+nodes discover each other with no centralized service. Can this be 100%
+decentralized?"
+
+Three centralizations were conflated, with three answers:
+
+1. **GitHub** is not in the runtime's critical path. Source: git is already
+   distributed and kappa-registry already speaks Git smart HTTP — code
+   hosting on the mesh is an existing capability. Release binaries are the
+   real bootstrap problem; solved the way Bitcoin Core and Tor do it:
+   reproducible builds, detached multi-signatures, artifacts published as
+   kappa objects and swarm-mirrored, verified at install. GitHub demotes to
+   one mirror among many.
+2. **Veilid completes the kappa layer instead of replacing it.** The kappa
+   federation already is a DHT: signed provider edges and namespace roots,
+   replicated by RBSR in O(difference). What kappa nodes lack is
+   reachability behind hard NAT. `kappa-transport-veilid` (existing kappa
+   feature flag) supplies it: every node reachable over the overlay, no
+   public IP or DNS needed. Discovery, announcements, and root epochs all
+   ride the overlay; the rendezvous fabric becomes fully peer-to-peer.
+3. **DHT solves discovery, not availability or throughput.** The first copy
+   of a model is seeded by its publisher at `hub share` time. Bulk transfer
+   stays on Iroh direct QUIC after discovery (BitTorrent's pattern: DHT for
+   peers, direct connections for data); Veilid overlay routing is the
+   sovereign fallback, not the fast path.
+
+Result: **no mandatory centralized service anywhere in the runtime.** Every
+centralized thing demotes to an optional accelerator:
+
+| Service | Decentralized form |
+|---|---|
+| Tracker/discovery | kappa federation over Veilid transport |
+| Bulk transfer | Iroh direct QUIC; Veilid as fallback |
+| First copy | publisher seeds at `hub share` |
+| Code hosting | git-on-kappa (already implemented) |
+| Release binaries | signed kappa objects, swarm-mirrored, verified at install |
+| HF fallback | optional accelerator when the mesh is cold |
+
+Honest asymptotes: Veilid's community bootstrap nodes (first introduction
+only, anyone can run one — Bitcoin's DNS-seed analogy); someone must build
+release binaries; someone must hold the first byte of a model. "Zero
+load-bearing intermediaries" is the achievable and correct property.
+
+Network effect, restated: more seeders = more capacity; more kappa nodes =
+more rendezvous and mirrors; more Veilid nodes = more overlay resilience.
+Every participant improves discovery, availability, and bandwidth at once.
+
+## 8. Non-goals
 
 No BitTorrent transport in v1 (Iroh covers the need; two swarms split the
 mesh). No DHT content routing before the federation proves insufficient. No
