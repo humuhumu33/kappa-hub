@@ -118,7 +118,7 @@ function modelPage(m, files) {
   const fact = (label, value) => (value ? `<div><dt>${label}</dt><dd>${value}</dd></div>` : "");
   const copy = (text, shown) => `<button type="button" class="copy" data-copy="${R.esc(text)}" aria-label="Copy ${R.esc(text)}">${R.esc(shown)}${R.icon.copy}</button>`;
   const facts = [
-    fact("Status", `<span class="${m.state === "addressed" ? "ok" : "dim"}">${R.STATE_LABEL[m.state]}</span>`),
+    fact("Status", `<span class="${m.state === "addressed" ? "ok" : m.state === "skipped" ? "bad" : "dim"}">${R.STATE_LABEL[m.state]}</span>`),
     fact("Trending", `#${m.rank}`),
     fact("Family", R.esc(m.family)),
     fact("Parameters", R.params(m.params)),

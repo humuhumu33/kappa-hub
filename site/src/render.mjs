@@ -18,7 +18,7 @@ export const FACETS = [
   { key: "modality", param: "modality", label: "Modality", tab: "main", icon: "grid" },
   { key: "bucket", param: "size", label: "Parameter count", tab: "main", icon: "tag", fixed: ["Under 1B", "1 to 3B", "4 to 9B", "10 to 20B", "21 to 40B", "41 to 100B", "101 to 300B", "Over 300B"] },
   { key: "family", param: "family", label: "Model family", tab: "main", icon: "layers", search: true },
-  { key: "stateLabel", param: "status", label: "Status", tab: "main", icon: "seal", fixed: ["Verified", "Queued", "Gated"] },
+  { key: "stateLabel", param: "status", label: "Status", tab: "main", icon: "seal", fixed: ["Verified", "Queued", "Unverified"] },
   { key: "recency", param: "released", label: "Release recency", tab: "main", icon: "calendar", fixed: RECENCY.map(([l]) => l), plain: true },
   { key: "arch", param: "arch", label: "Architecture", tab: "arch", icon: "cpu", search: true },
   { key: "languages", param: "language", label: "Language", tab: "language", icon: "globe", search: true },
@@ -32,7 +32,7 @@ export const TABS = [
   ["format", "Format", "file"], ["library", "Library", "box"], ["license", "License", "scale"],
 ];
 
-export const STATE_LABEL = { addressed: "Verified", pending: "Queued", skipped: "Gated" };
+export const STATE_LABEL = { addressed: "Verified", pending: "Queued", skipped: "Unverified" };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
