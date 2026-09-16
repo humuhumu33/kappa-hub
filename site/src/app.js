@@ -1,9 +1,11 @@
 import * as R from "./render.mjs";
+import * as B from "./braille.mjs";
 
 const base = document.documentElement.dataset.base;
 const $ = (s, el = document) => el.querySelector(s);
 
 themeSwitch();
+B.play();
 if ($("#browse")) browse();
 if ($("[data-verify]")) model();
 copyButtons();
@@ -22,6 +24,7 @@ async function browse() {
     const focus = document.activeElement?.dataset?.facetSearch;
     filters.innerHTML = R.filters(r, state, order);
     grid.innerHTML = R.grid(r, { base });
+    B.play(grid);
     pager.innerHTML = R.pager(r, state);
     total.textContent = r.results.length.toLocaleString("en-US");
     $("#sheet-count").textContent = total.textContent;
@@ -143,15 +146,46 @@ async function browse() {
 function model() {
   const button = $("[data-verify]"), out = $("#verdict");
   const id = button.dataset.verify, pinned = button.dataset.manifest;
+  const glyph = [...document.querySelectorAll("#glyph .cell")];
+  const pinnedBytes = B.hexToBytes(pinned.split(":")[1]);
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const wait = (ms) => new Promise((r) => setTimeout(r, calm ? 0 : ms));
+
+  // While the browser fetches and hashes, the cells search. When the digest is known, each byte locks
+  // left to right and is compared with the pinned address: every lit dot is a real bit of the result.
+  let searching = false;
+  function search() {
+    if (!searching || calm) return;
+    for (const svg of glyph) if (!svg.classList.contains("ok") && !svg.classList.contains("bad")) B.setCell(svg, (Math.random() * 256) | 0);
+    setTimeout(search, 70);
+  }
+  async function lock(received) {
+    for (let i = 0; i < glyph.length; i++) {
+      const byte = received ? received[i] : pinnedBytes[i];
+      B.setCell(glyph[i], byte, received && byte === pinnedBytes[i] ? "ok lock" : "bad");
+      const svg = glyph[i];
+      setTimeout(() => svg.classList.remove("lock"), 260);
+      await wait(34);
+    }
+    searching = false;
+  }
+
   button.addEventListener("click", async () => {
     button.disabled = true;
+    button.classList.add("busy");
+    B.play(button);
     out.hidden = false;
     out.className = "verdict";
     out.textContent = "Checking the bytes in your browser.";
+    for (const svg of glyph) svg.setAttribute("class", "cell");
+    searching = true;
+    search();
     const started = performance.now();
+    let received = null;
     try {
       const api = await import("https://humuhumu33.github.io/hologram-api/hologram.js");
       const doc = await api.resolve(id, { manifest: pinned });
+      received = B.hexToBytes(doc.manifest.split(":")[1]);
       const small = doc.files.filter((f) => !f.weights && f.size && f.size < 4e6).sort((a, b) => a.size - b.size).pop();
       let fileLine = "";
       if (small) {
@@ -159,13 +193,17 @@ function model() {
         fileLine = ` and ${small.path}`;
       }
       const ms = Math.round(performance.now() - started);
+      await lock(received);
       out.className = "verdict ok";
       out.textContent = `Verified in ${ms} ms. The manifest of ${doc.files.length} files${fileLine} match their addresses.`;
     } catch (error) {
+      await lock(received);
       out.className = "verdict bad";
       out.textContent = error.code === "ADDRESS_MISMATCH" ? "These bytes do not match their address." : `Could not verify: ${error.message}`;
     } finally {
+      searching = false;
       button.disabled = false;
+      button.classList.remove("busy");
     }
   });
 
@@ -229,7 +267,10 @@ function themeSwitch() {
       sync();
     };
     const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (document.startViewTransition && !calm) document.startViewTransition(run); else run();
+    if (document.startViewTransition && !calm && !document.hidden) {
+      const t = document.startViewTransition(run);
+      for (const p of [t.ready, t.finished, t.updateCallbackDone]) p?.catch(() => {});
+    } else run();
   }
 
   // Full size wallpapers load the moment the menu opens, so Immersive appears instantly.

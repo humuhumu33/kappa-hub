@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as R from "./src/render.mjs";
+import * as B from "./src/braille.mjs";
 
 const SITE = dirname(fileURLToPath(import.meta.url));
 const DIST = join(SITE, "dist");
@@ -114,6 +115,15 @@ const browse = page({
 });
 
 // ---- model pages
+// The manifest address drawn as braille: 32 bytes, 32 cells, two rows of 16. Lossless: the dots are the bits.
+function signature(manifest) {
+  const bytes = B.hexToBytes(manifest.split(":")[1]);
+  return `<div class="signature" title="${R.esc(manifest)}">
+    <span class="signature-label">Manifest address, one braille cell per byte</span>
+    <span class="bx glyph" id="glyph" aria-hidden="true"><span>${B.cells(bytes.slice(0, 16))}</span><span>${B.cells(bytes.slice(16))}</span></span>
+  </div>`;
+}
+
 function modelPage(m, files) {
   const fact = (label, value) => (value ? `<div><dt>${label}</dt><dd>${value}</dd></div>` : "");
   const copy = (text, shown) => `<button type="button" class="copy" data-copy="${R.esc(text)}" aria-label="Copy ${R.esc(text)}">${R.esc(shown)}${R.icon.copy}</button>`;
@@ -164,9 +174,10 @@ function modelPage(m, files) {
     </div>
     <div class="actions">
       <a class="button" href="https://huggingface.co/${R.esc(m.id)}">Hugging Face${R.icon.external}</a>
-      ${m.manifest ? `<button type="button" class="button primary" data-verify="${R.esc(m.id)}" data-manifest="${R.esc(m.manifest)}">${R.icon.check}Verify</button>` : ""}
+      ${m.manifest ? `<button type="button" class="button primary" data-verify="${R.esc(m.id)}" data-manifest="${R.esc(m.manifest)}">${R.icon.check}${B.loader("orbit")}<span>Verify</span></button>` : ""}
     </div>
   </div>
+  ${m.manifest ? signature(m.manifest) : ""}
   <p class="verdict" id="verdict" role="status" hidden></p>
 </section>
 <main class="detail">
@@ -196,7 +207,7 @@ for (const m of models) {
 
 const slim = models.map(({ stateLabel, task, recency, isNew, ...m }) => m);
 await writeFile(join(DIST, "data", "models.json"), JSON.stringify({ snapshot: data.snapshot, models: slim }));
-for (const f of ["app.js", "render.mjs", "styles.css", "tokens.css"]) await cp(join(SITE, "src", f), join(DIST, f));
+for (const f of ["app.js", "render.mjs", "braille.mjs", "styles.css", "tokens.css"]) await cp(join(SITE, "src", f), join(DIST, f));
 await mkdir(join(DIST, "kit"), { recursive: true });
 for (const f of ["hologram-warm.css", "hologram-gap-tokens.css"]) await cp(join(KIT, f), join(DIST, "kit", f));
 await cp(join(KIT, "fonts"), join(DIST, "fonts"), { recursive: true });

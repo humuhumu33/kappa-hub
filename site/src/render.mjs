@@ -1,4 +1,5 @@
 // Shared by the static build (Node) and the browser. Pure functions: data in, HTML out.
+import * as B from "./braille.mjs";
 
 export const PAGE_SIZE = 42;
 const NEW_DAYS = 14;
@@ -151,7 +152,7 @@ export function avatar(m, base, cls = "avatar") {
 export function tags(m, { full = false } = {}) {
   return [
     full ? "" : `<span class="tag">${esc(m.org)}</span>`,
-    `<span class="tag state ${m.state}">${STATE_LABEL[m.state]}</span>`,
+    `<span class="tag state ${m.state}">${STATE_LABEL[m.state]}${m.state === "pending" ? B.loader("scan") : ""}</span>`,
     m.isNew ? `<span class="tag new">New</span>` : "",
     m.params ? `<span class="tag">${params(m.params)}</span>` : "",
     m.context ? `<span class="tag">${context(m.context)}</span>` : "",
