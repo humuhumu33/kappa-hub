@@ -6,6 +6,7 @@
 // HOLOGRAM_API may point at a local hologram-api checkout or a URL (default: its GitHub Pages site).
 
 import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -110,6 +111,7 @@ async function main() {
   const complete = (s) => (s.weights ? s.weights_identical === s.weights : s.identical === s.files);
 
   await rm(join(DATA, "files"), { recursive: true, force: true });
+  await rm(join(DATA, "overview"), { recursive: true, force: true });
   await mkdir(AVATARS, { recursive: true });
 
   const models = await pool(trending, 8, async (m, i) => {
@@ -151,6 +153,20 @@ async function main() {
         await mkdir(dirname(file), { recursive: true });
         await writeFile(file, JSON.stringify({ revision: doc.revision, manifest: doc.manifest, sources,
           files: doc.files.map((f) => [f.path, f.size, f.address, f.weights ? 1 : 0, f.url]) }));
+      }
+    }
+    // Overview: the model passport from hologram-api, and the README at the same revision, checked by address.
+    const overview = await get(`${API}/v1/overview/huggingface.co/${m.id}.json`);
+    if (overview) {
+      const dir = join(DATA, "overview", org);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, `${name}.json`), JSON.stringify(overview));
+      const pinned = overview.provenance?.readme?.match(/@sha256:([0-9a-f]{64})/)?.[1];
+      if (pinned && overview.revision) {
+        const readme = await get(`${HF}/${m.id}/resolve/${overview.revision}/README.md`, "bytes");
+        if (readme && createHash("sha256").update(readme).digest("hex") === pinned) {
+          await writeFile(join(dir, `${name}.md`), readme);
+        }
       }
     }
     return row;

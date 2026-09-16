@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as R from "./src/render.mjs";
 import * as B from "./src/braille.mjs";
+import { overview, metaDescription } from "./src/overview.mjs";
 
 const SITE = dirname(fileURLToPath(import.meta.url));
 const DIST = join(SITE, "dist");
@@ -143,22 +144,16 @@ function probe(files) {
     .sort((a, b) => a[1] - b[1]).pop()?.[0];
 }
 
-function modelPage(m, files) {
+function modelPage(m, files, ov, readme) {
   const fact = (label, value) => (value ? `<div><dt>${label}</dt><dd>${value}</dd></div>` : "");
   const copy = (text, shown) => `<button type="button" class="copy" data-copy="${R.esc(text)}" aria-label="Copy ${R.esc(text)}">${R.esc(shown)}${R.icon.copy}</button>`;
+  // Identity and trust only; everything descriptive lives in the Overview tab.
   const facts = [
     fact("Status", `<span class="${m.state === "addressed" ? "ok" : m.state === "skipped" ? "bad" : "dim"}">${R.STATE_LABEL[m.state]}</span>`),
     fact("Trending", `#${m.rank}`),
-    fact("Family", R.esc(m.family)),
-    fact("Parameters", R.params(m.params)),
-    fact("Context", R.context(m.context)),
-    fact("Architecture", R.esc(m.arch)),
-    fact("Library", R.esc(m.library)),
-    fact("License", R.esc(m.license)),
-    fact("Likes", R.count(m.likes)),
-    fact("Downloads", R.count(m.downloads)),
-    fact("Released", R.month(m.created)),
+    fact("Downloads, 30 days", R.count(m.downloads)),
     m.weightBytes ? fact("Weights", R.bytes(m.weightBytes)) : "",
+    files?.sources?.length ? fact("Sources", String(files.sources.length)) : "",
     m.revision ? fact("Revision", copy(m.revision, m.revision.slice(0, 12))) : "",
     m.manifest ? fact("Manifest", copy(m.manifest, R.shortAddress(m.manifest))) : "",
   ].join("");
@@ -185,7 +180,7 @@ function modelPage(m, files) {
     const rows = files.files.map(([path, size, address, , hfUrl]) => `<tr data-path="${R.esc(path)}" data-size="${size ?? 0}" data-address="${R.esc(address)}"><td class="path" title="${R.esc(path)}">${R.esc(path)}</td><td class="size">${R.bytes(size)}</td><td class="addr">${copy(address, R.shortAddress(address))}</td>${SOURCE_COLUMNS.map((c) => cell(c, path, size, address, hfUrl)).join("")}</tr>`).join("\n");
     const http = SOURCE_COLUMNS.filter(([kind]) => byKind[kind] && !byKind[kind].p2p);
     const torrent = byKind.bittorrent;
-    filesPanel = `<div class="section-head"><h2>Files</h2><span class="pill">${files.files.length}</span>
+    filesPanel = `<div class="section-head">
       <div class="download-all" data-name="${R.esc(m.name)}" data-repo="${R.esc(m.id)}" data-revision="${R.esc(files.revision)}">
         <button type="button" class="button" id="dl-all" aria-haspopup="menu" aria-expanded="false" aria-controls="dl-menu">${R.icon.down}Download all</button>
         <div class="menu" id="dl-menu" role="menu" aria-label="Download all" hidden>
@@ -205,12 +200,12 @@ function modelPage(m, files) {
     const note = m.state === "skipped"
       ? "This model is gated on Hugging Face. Addresses are recorded for public models only."
       : "This model is queued. Every file receives its address on the next daily index.";
-    filesPanel = `<div class="section-head"><h2>Files</h2></div><p class="note">${note}</p>`;
+    filesPanel = `<p class="note">${note}</p>`;
   }
 
   return page({
     title: `${m.name} · Hologram Models Hub`,
-    description: `${m.id}: every file of this model with the address that proves its bytes.`,
+    description: metaDescription(ov) || `${m.id}: every file of this model with the address that proves its bytes.`,
     search: true,
     body: `<a class="back" href="${base}">${R.icon.left}Models</a>
 <section class="panel">
@@ -232,7 +227,14 @@ function modelPage(m, files) {
 </section>
 <main class="detail">
   <section class="panel"><dl class="facts">${facts}</dl></section>
-  <section class="panel">${filesPanel}</section>
+  <section class="panel">
+    <div class="panel-tabs" role="tablist" aria-label="Model">
+      <button type="button" class="tab" role="tab" id="tab-overview" aria-controls="pane-overview" aria-selected="true">Overview</button>
+      <button type="button" class="tab" role="tab" id="tab-files" aria-controls="pane-files" aria-selected="false" tabindex="-1">Files${files ? `<span class="pill">${files.files.length}</span>` : ""}</button>
+    </div>
+    <div class="pane" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">${overview(m, ov, readme)}</div>
+    <div class="pane" id="pane-files" role="tabpanel" aria-labelledby="tab-files" hidden>${filesPanel}</div>
+  </section>
 </main>`,
   });
 }
@@ -250,9 +252,12 @@ await writeFile(join(DIST, "404.html"), page({
 for (const m of models) {
   const filesPath = join(SITE, "data", "files", m.org, `${m.name}.json`);
   const files = existsSync(filesPath) ? JSON.parse(await readFile(filesPath, "utf8")) : null;
+  const ovPath = join(SITE, "data", "overview", m.org, `${m.name}.json`), mdPath = join(SITE, "data", "overview", m.org, `${m.name}.md`);
+  const ov = existsSync(ovPath) ? JSON.parse(await readFile(ovPath, "utf8")) : null;
+  const readme = existsSync(mdPath) ? await readFile(mdPath, "utf8") : null;
   const dir = join(DIST, "models", m.org, m.name);
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "index.html"), modelPage(m, files));
+  await writeFile(join(dir, "index.html"), modelPage(m, files, ov, readme));
 }
 
 const slim = models.map(({ stateLabel, task, recency, isNew, ...m }) => m);

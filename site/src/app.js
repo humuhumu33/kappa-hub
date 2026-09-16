@@ -238,6 +238,7 @@ function model() {
   });
 
   downloads();
+  panelTabs();
 
   const table = $("#files");
   if (table) {
@@ -256,6 +257,31 @@ function model() {
       body.append(...rows);
     });
   }
+}
+
+// Overview and Files: tabs that keep their place in the URL hash and move with arrow keys.
+function panelTabs() {
+  const tabs = [...document.querySelectorAll(".panel-tabs [role=tab]")];
+  if (!tabs.length) return;
+  const select = (tab, focus) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    }
+    if (focus) tab.focus();
+    const hash = tab.id === "tab-files" ? "#files" : "";
+    if (location.hash !== hash) history.replaceState(null, "", `${location.pathname}${location.search}${hash}`);
+  };
+  for (const t of tabs) {
+    t.addEventListener("click", () => select(t));
+    t.addEventListener("keydown", (e) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (step) { e.preventDefault(); select(tabs[(tabs.indexOf(t) + step + tabs.length) % tabs.length], true); }
+    });
+  }
+  if (location.hash === "#files") select(tabs[1]);
 }
 
 // Every download is checked against the index address before it is kept.

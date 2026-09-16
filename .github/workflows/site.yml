@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Build dependencies (markdown-it, build time only)
+        run: npm ci --prefix site
       - name: Data (trending Hugging Face models joined with the Hologram address index)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
