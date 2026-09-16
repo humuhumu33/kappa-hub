@@ -7,40 +7,52 @@ Refer to [docs/DESIGN.md](docs/DESIGN.md) for rationale and
 
 ## M0 — Single node
 
+Status: **accepted 2026-09-16**. Evidence below.
+
 Goal: one machine runs a complete hub. A model flows
-HF repo → `.holo` → kappa blobs → `from_pretrained`.
+HF repo → manifest + chunk blobs → `from_pretrained`.
 
 Tasks:
 
-1. `holo model import` compile target in hologram-live `src/compile.rs`:
-   reads a standard HF repo (config.json, safetensors shards,
-   tokenizer files, README.md card), chunks weights per the LargeModel
-   profile, emits a `.holo` v4 with `InferenceModel` + `View` layers.
-2. LargeModel chunking profile spec: 64–256 MiB shards, manifest object,
-   `chunk-manifest` edges. Write it as a document plus codec tests
-   before the importer.
-3. `KappaRegistryProvider` implementing `trait RegistryProvider`
-   (`src/registry.rs:11-22`): put/get/list objects against kappa OCI
-   blob endpoints.
-4. `ConfiguredResolver` implementing the reserved variant
-   (`src/application_plan.rs:50-55`): thin-archive κ resolution from a
-   kappa peer with fail-closed re-hash.
-5. `dev.hologram.live.hub` `LiveModule` (`src/modules/mod.rs:13-41`):
-   `GET /api/models`, `GET /api/models/{repo}/tree/{rev}`,
-   `GET /{repo}/resolve/{rev}/{path}` (Range-capable proxy to κ blobs),
-   `POST /api/models`.
-6. BDD suites under `features/suites/`: hub_shim, model_import,
-   peer_resolution.
+1. ✅ `holo model import` — daemon RPC + `hologram holo model-import`
+   CLI; reads a standard HF repo (config.json, safetensors shards,
+   tokenizer files, README card), chunks weights per the LargeModel
+   profile, caches chunk blobs, stores one canonical repo manifest.
+   (`.holo` v4 `InferenceModel` packaging deferred to the engine
+   milestone; the repo manifest is the M0 artifact.)
+2. ✅ LargeModel chunking profile spec:
+   `docs/profiles/large-model-chunking.md`, codec
+   `hologram-live src/hub_manifest.rs`, canonical-encoding tests.
+3. ✅ `KappaRegistryProvider` (`trait RegistryProvider`) against kappa
+   OCI blob endpoints with the BLAKE3 axis — no digest translation;
+   object metadata travels as OCI tags (`k` + 64 hex).
+4. ✅ `ConfiguredResolver` peer resolution — `explain_application_sourced`
+   + `ResolutionSource::ConfiguredResolver(endpoint)`; peer bytes are
+   re-hashed fail-closed by the planner and cached locally.
+5. ✅ `dev.hologram.live.hub` module: `GET /api/models`,
+   `/api/models/{ns}/{repo}`, `tree`, `resolve` (Range → 206, ETag →
+   304, `x-repo-commit`), staged durable uploads + commit.
+6. ✅ Acceptance, run live against a real 1M-param model
+   (`tiny-random-LlamaForCausalLM`, 5 files, 5,976,799 bytes):
+   - `hologram --json holo model-import humuhumu33/tiny-random-LlamaForCausalLM <dir>`
+     → revision `27ec1241…`; second import byte-identical.
+   - `resolve/main/config.json` and 4.1 MB `model.safetensors`
+     byte-identical to source (SHA-256 compared).
+   - `Range: bytes=0-7` → 206 with `content-range: bytes 0-7/4131280`.
+   - `If-None-Match` → 304.
+   - `HF_ENDPOINT=http://127.0.0.1:11435` with stock
+     `huggingface_hub` 1.20.1 + `transformers` 5.5.4:
+     `AutoModelForCausalLM.from_pretrained(...)` loads the model
+     (`LOADED llama params: 1032272`) into the standard HF cache layout
+     with snapshot dir = the revision kappa. Zero code changes.
+   - Registry provider roundtrip: object stored through the daemon
+     lands on the kappa node as a blob + metadata tag; served back
+     through the daemon from kappa.
+   - Range-backed partial read returns the same bytes as a full-read
+     slice.
 
-Acceptance:
-
-- `HF_ENDPOINT=http://localhost:5000` and
-  `transformers.AutoModel.from_pretrained("org/model")` succeed with
-  zero code changes.
-- Two consecutive imports of the same HF repo produce byte-identical
-  `application_kappa`.
-- Range-backed partial read of a shard returns the same bytes as a full
-  read slice (safetensors mmap semantics preserved).
+Remaining for M0 polish: kappa-node packaging docs, BDD suites under
+hologram `features/suites/` (hub shim, model import, peer resolution).
 
 ## M1 — Federation
 

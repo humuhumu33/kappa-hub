@@ -53,8 +53,9 @@ them):
    by `path`.
 2. `format` is exactly `kappahub.repo-manifest/v1`.
 3. `name` is `namespace/repo`; both parts non-empty; characters limited
-   to `[a-z0-9._-]`; exactly one `/`; no leading, trailing, or doubled
-   dots beyond the charset rule.
+   to `[A-Za-z0-9._-]` (Hugging Face repo ids are case-preserving);
+   exactly one `/`; no leading, trailing, or doubled dots beyond the
+   charset rule.
 4. `path` is repo-relative: no leading `/`, no `\`, no `.` or `..`
    segments, no control characters, unique across `files`.
 5. `media_type` is optional; default `application/octet-stream`.
