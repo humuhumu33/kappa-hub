@@ -65,6 +65,7 @@ ${STYLES.map((s) => `<link rel="stylesheet" href="${base}${s}">`).join("\n")}
 <script type="module" src="${base}app.js"></script>
 </head>
 <body>
+<div class="veil" aria-hidden="true"></div>
 <div class="shell">
 <header class="top">
   <a class="brand" href="${base}" aria-label="Hologram Models Hub"><img class="mark on-dark" src="${base}logos/Hologram_Logomark_White.svg" alt="" width="32" height="32"><img class="word on-dark" src="${base}logos/Hologram_Wordmark_White.svg" alt="Hologram" width="172" height="16"><img class="mark on-light" src="${base}logos/Hologram_Logomark_Black.svg" alt="" width="32" height="32"><img class="word on-light" src="${base}logos/Hologram_Wordmark_Black.svg" alt="Hologram" width="172" height="16"><span class="hub">Models Hub</span></a>
@@ -95,6 +96,7 @@ const browse = page({
     <div class="sheet-footer"><button type="button" class="button primary" id="sheet-done">Show <span id="sheet-count">${r.results.length}</span> models</button></div>
   </aside>
   <section class="panel" id="results" aria-label="Models">
+    <div class="results-head">
     <div class="head"><h1>Models</h1><span class="pill" id="total">${r.results.length}</span></div>
     <div class="bar">
       <label class="field search">${R.icon.search}<input id="q" type="search" placeholder="Search models" autocomplete="off" spellcheck="false" aria-label="Search models"></label>
@@ -103,6 +105,7 @@ const browse = page({
         <button type="button" id="sort" aria-haspopup="listbox" aria-expanded="false"><span id="sort-label">Trending</span>${R.icon.chevron}</button>
         <ul role="listbox" id="sort-list" aria-label="Sort" hidden>${sortMenu}</ul>
       </div>
+    </div>
     </div>
     <div class="grid" id="grid">${R.grid(r, { base })}</div>
     <nav class="pager" id="pager" aria-label="Pages">${R.pager(r, initial)}</nav>
