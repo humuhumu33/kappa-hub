@@ -116,7 +116,7 @@ const browse = page({
 });
 
 // ---- model pages
-const SOURCE_COLUMNS = [["huggingface.co", "Hugging Face"], ["modelscope.cn", "ModelScope"], ["ipfs", "IPFS"], ["bittorrent", "BitTorrent"]];
+const SOURCE_COLUMNS = [["huggingface.co", "Hugging Face"], ["modelscope.cn", "ModelScope"], ["ipfs", "IPFS"], ["bittorrent", "P2P"]];
 // The manifest address drawn as braille: 32 bytes, 32 cells, two rows of 16. Lossless: the dots are the bits.
 function signature(manifest) {
   const bytes = B.hexToBytes(manifest.split(":")[1]);
@@ -130,7 +130,7 @@ function signature(manifest) {
 function sourceList(sources) {
   return `<div class="sources">
     <span class="label">${sources.length > 1 ? "Identical bytes on" : "Available from"}</span>
-    <ul>${sources.map((s) => `<li data-source="${R.esc(s.kind)}"${s.p2p ? ' title="Your torrent client checks every piece as it downloads. Hugging Face seeds it, so it completes with zero peers."' : ""}><span class="state">${s.p2p ? R.icon.nodes : R.icon.seal}${B.loader("orbit")}${R.icon.check}${R.icon.close}</span><a href="${R.esc(s.page)}"${s.p2p ? " download" : ' target="_blank" rel="noopener"'}>${R.esc(s.name)}${s.p2p ? R.icon.down : R.icon.external}</a></li>`).join("")}</ul>
+    <ul>${sources.map((s) => `<li data-source="${R.esc(s.kind)}"${s.p2p ? ' title="Peer to peer via BitTorrent. Your torrent client checks every piece; Hugging Face seeds it, so it completes with zero peers."' : ""}><span class="state">${s.p2p ? R.icon.nodes : R.icon.seal}${B.loader("orbit")}${R.icon.check}${R.icon.close}</span><a href="${R.esc(s.page)}"${s.p2p ? " download" : ' target="_blank" rel="noopener"'}>${R.esc(s.name)}${s.p2p ? R.icon.down : R.icon.external}</a></li>`).join("")}</ul>
   </div>`;
 }
 
@@ -176,7 +176,7 @@ function modelPage(m, files) {
         return `<td class="dl"><span class="dl-no" role="img" aria-label="Not available on ${name}" title="Not available on ${name}">${R.icon.close}</span></td>`;
       }
       if (s.p2p) {
-        return `<td class="dl"><a class="dl-yes" href="${R.esc(s.page)}" title="Torrent with every file. Pick ${R.esc(path)} in your client" aria-label="Torrent from ${name} for ${R.esc(path)}">${R.icon.down}</a></td>`;
+        return `<td class="dl"><a class="dl-yes" href="${R.esc(s.page)}" title="Peer to peer: a BitTorrent file with every file. Pick ${R.esc(path)} in your torrent client" aria-label="Peer to peer torrent for ${R.esc(path)}">${R.icon.down}</a></td>`;
       }
       const href = kind === "huggingface.co" ? hfUrl : s.resolve + encodePath(path);
       return `<td class="dl"><a class="dl-yes" href="${R.esc(href)}" data-download data-source="${name}" title="Download ${R.esc(path)} from ${name}, checked against its address" aria-label="Download ${R.esc(path)} from ${name}">${R.icon.down}</a></td>`;
@@ -191,7 +191,7 @@ function modelPage(m, files) {
         <div class="menu" id="dl-menu" role="menu" aria-label="Download all" hidden>
           <p class="menu-note">${files.files.length} files, ${R.bytes(total)}. Every file is checked against its address.</p>
           ${http.map(([kind, name]) => `<button type="button" role="menuitem" data-save="${name}" data-save-kind="${kind}">${R.icon.file}<span class="label">Save to a folder from ${name}</span></button>`).join("")}
-          ${torrent ? `<a role="menuitem" href="${R.esc(torrent.page)}">${R.icon.nodes}<span class="label">Torrent with every file</span></a>` : ""}
+          ${torrent ? `<a role="menuitem" href="${R.esc(torrent.page)}">${R.icon.nodes}<span class="label">Peer to peer, every file (.torrent)</span></a>` : ""}
           <button type="button" role="menuitem" data-script>${R.icon.copy}<span class="label">Download script for a terminal</span></button>
         </div>
       </div>
