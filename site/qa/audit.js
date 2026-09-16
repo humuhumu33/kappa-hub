@@ -10,7 +10,7 @@
     if (!visible(el)) continue;
     const h = Math.round(el.getBoundingClientRect().height);
     out.heights[h] = (out.heights[h] || 0) + 1;
-    if (!HEIGHTS.has(h) && !el.closest(".copy, th, .card") && !el.matches(".copy, .card")) out.badHeights.push(`${el.className || el.tagName} ${h}`);
+    if (!HEIGHTS.has(h) && !el.closest(".copy, th, .card, .wall-row") && !el.matches(".copy, .card")) out.badHeights.push(`${el.className || el.tagName} ${h}`);
   }
 
   const SIZES = new Set([14, 16, 18, 30]);

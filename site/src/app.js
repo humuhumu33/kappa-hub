@@ -3,6 +3,7 @@ import * as R from "./render.mjs";
 const base = document.documentElement.dataset.base;
 const $ = (s, el = document) => el.querySelector(s);
 
+themeSwitch();
 if ($("#browse")) browse();
 if ($("[data-verify]")) model();
 copyButtons();
@@ -199,4 +200,66 @@ function copyButtons() {
       setTimeout(() => { const now = b.querySelector(".i"); if (now && was) now.outerHTML = was; }, 1300);
     } catch {}
   });
+}
+
+// Dark, Light, Immersive. Dark for first visits; the choice is kept on this device.
+function themeSwitch() {
+  const KEY = "hologram-models-hub.theme";
+  const root = document.documentElement, button = $("#theme-button"), menu = $("#theme-menu");
+  if (!button) return;
+  const walls = JSON.parse($("#wallpapers").textContent);
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+  let warmed = false;
+
+  function sync() {
+    const mode = root.dataset.theme, wall = root.dataset.wallpaper;
+    for (const b of menu.querySelectorAll("[data-theme-mode]")) b.setAttribute("aria-checked", String(b.dataset.themeMode === mode));
+    for (const b of menu.querySelectorAll("[data-wallpaper]")) b.setAttribute("aria-checked", String(mode === "immersive" && b.dataset.wallpaper === wall));
+    const w = walls.find((x) => x.key === wall);
+    $("#walls").classList.toggle("on", mode === "immersive");
+    $("#wall-credit").innerHTML = w ? `${w.name}, photo by <a href="${w.url}" target="_blank" rel="noopener">${w.by}</a> on Unsplash` : "";
+  }
+
+  function apply(mode, wallpaper = root.dataset.wallpaper) {
+    const run = () => {
+      root.dataset.theme = mode;
+      root.dataset.wallpaper = wallpaper;
+      root.classList.toggle("dark", mode !== "light");
+      try { localStorage.setItem(KEY, JSON.stringify({ mode, wallpaper })); } catch {}
+      sync();
+    };
+    const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (document.startViewTransition && !calm) document.startViewTransition(run); else run();
+  }
+
+  // Full size wallpapers load the moment the menu opens, so Immersive appears instantly.
+  function warm() {
+    if (warmed) return;
+    warmed = true;
+    for (const w of walls) { const img = new Image(); img.decoding = "async"; img.src = `${base}wallpapers/${w.key}.jpg`; }
+  }
+
+  const items = () => [...menu.querySelectorAll('[role="menuitemradio"]')];
+  function open(show, focusFirst) {
+    menu.hidden = !show;
+    button.setAttribute("aria-expanded", String(show));
+    if (show) { warm(); sync(); if (focusFirst) (menu.querySelector('[aria-checked="true"]') || items()[0]).focus(); }
+  }
+
+  button.addEventListener("click", (e) => { e.stopPropagation(); open(menu.hidden, e.detail === 0); });
+  button.addEventListener("pointerenter", warm, { once: true });
+  menu.addEventListener("click", (e) => {
+    const mode = e.target.closest("[data-theme-mode]"), wall = e.target.closest("[data-wallpaper]");
+    if (mode) apply(mode.dataset.themeMode);
+    if (wall) apply("immersive", wall.dataset.wallpaper);
+  });
+  menu.addEventListener("keydown", (e) => {
+    const list = items(), i = list.indexOf(document.activeElement);
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    if (step) { e.preventDefault(); list[(i + step + list.length) % list.length].focus(); }
+    if (e.key === "Escape") { open(false); button.focus(); }
+  });
+  document.addEventListener("click", (e) => { if (!menu.hidden && !e.target.closest(".appearance")) open(false); });
+  window.addEventListener("storage", (e) => { if (e.key === KEY) { const s = read(); if (s.mode) apply(s.mode, s.wallpaper || "alps"); } });
+  sync();
 }

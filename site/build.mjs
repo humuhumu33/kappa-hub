@@ -19,10 +19,35 @@ const INDEX = "https://github.com/humuhumu33/hologram-api";
 const data = JSON.parse(await readFile(join(SITE, "data", "models.json"), "utf8"));
 const models = R.prepare(data.models, data.snapshot);
 
+const WALLPAPERS = [
+  { key: "alps", name: "Alpine Dawn", by: "Unsplash", url: "https://unsplash.com/?utm_source=Hologram&utm_medium=referral" },
+  { key: "galaxy", name: "Galaxy", by: "Tiago Ferreira", url: "https://unsplash.com/@tiago_f_ferreira?utm_source=Hologram&utm_medium=referral" },
+  { key: "aurora", name: "Aurora", by: "Lightscape", url: "https://unsplash.com/@lightscape?utm_source=Hologram&utm_medium=referral" },
+];
+const THEMES = [["dark", "Dark", "moon"], ["light", "Light", "sun"], ["immersive", "Immersive", "image"]];
+
+// Runs before first paint: Dark for first visits, the saved choice after that. No flash.
+const prepaint = `(function(){var s={};try{s=JSON.parse(localStorage.getItem("hologram-models-hub.theme"))||{}}catch(e){}
+var m=["dark","light","immersive"].indexOf(s.mode)>=0?s.mode:"dark",w=${JSON.stringify(WALLPAPERS.map((w) => w.key))}.indexOf(s.wallpaper)>=0?s.wallpaper:"alps",r=document.documentElement;
+r.setAttribute("data-theme",m);r.setAttribute("data-wallpaper",w);r.classList.toggle("dark",m!=="light");
+if(m==="immersive"){var l=document.createElement("link");l.rel="preload";l.as="image";l.href="${base}wallpapers/"+w+".jpg";document.head.appendChild(l)}})();`;
+
+const themeSwitch = `<div class="appearance">
+      <button type="button" id="theme-button" aria-haspopup="menu" aria-expanded="false" aria-controls="theme-menu" aria-label="Theme" title="Theme">${THEMES.map(([k, , ic]) => R.icon[ic].replace('class="i"', `class="i" data-for="${k}"`)).join("")}</button>
+      <div class="menu" id="theme-menu" role="menu" aria-label="Theme" hidden>
+        ${THEMES.map(([k, label, ic]) => `<button type="button" role="menuitemradio" data-theme-mode="${k}" aria-checked="false">${R.icon[ic]}<span class="label">${label}</span>${R.icon.check.replace('class="i"', 'class="i tick"')}</button>`).join("")}
+        <div class="walls" id="walls">
+          <h3>Wallpaper</h3>
+          <div class="wall-row" role="group" aria-label="Wallpaper">${WALLPAPERS.map((w) => `<button type="button" class="wall" role="menuitemradio" data-wallpaper="${w.key}" aria-checked="false" aria-label="${w.name}" title="${w.name}"><img src="${base}wallpapers/${w.key}-thumb.jpg" alt="" width="320" height="198" decoding="async"></button>`).join("")}</div>
+          <p class="credit" id="wall-credit"></p>
+        </div>
+      </div>
+    </div>`;
+
 const STYLES = ["kit/hologram-warm.css", "kit/hologram-gap-tokens.css", "tokens.css", "styles.css"];
 
 const page = ({ title, description, body, search = false }) => `<!doctype html>
-<html lang="en" class="dark" data-base="${base}">
+<html lang="en" class="dark" data-theme="dark" data-wallpaper="alps" data-base="${base}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -30,7 +55,9 @@ const page = ({ title, description, body, search = false }) => `<!doctype html>
 <meta name="description" content="${R.esc(description)}">
 <meta property="og:title" content="${R.esc(title)}">
 <meta property="og:description" content="${R.esc(description)}">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="dark light">
+<script>${prepaint}</script>
+<script type="application/json" id="wallpapers">${JSON.stringify(WALLPAPERS)}</script>
 <link rel="icon" href="${base}logos/Hologram_Logomark_White.svg" type="image/svg+xml">
 <link rel="preload" href="${base}fonts/Geist-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="${base}fonts/GeistMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
@@ -40,11 +67,12 @@ ${STYLES.map((s) => `<link rel="stylesheet" href="${base}${s}">`).join("\n")}
 <body>
 <div class="shell">
 <header class="top">
-  <a class="brand" href="${base}" aria-label="Hologram Models Hub"><img class="mark" src="${base}logos/Hologram_Logomark_White.svg" alt="" width="32" height="32"><img class="word" src="${base}logos/Hologram_Wordmark_White.svg" alt="Hologram" width="172" height="16"><span class="hub">Models Hub</span></a>
+  <a class="brand" href="${base}" aria-label="Hologram Models Hub"><img class="mark on-dark" src="${base}logos/Hologram_Logomark_White.svg" alt="" width="32" height="32"><img class="word on-dark" src="${base}logos/Hologram_Wordmark_White.svg" alt="Hologram" width="172" height="16"><img class="mark on-light" src="${base}logos/Hologram_Logomark_Black.svg" alt="" width="32" height="32"><img class="word on-light" src="${base}logos/Hologram_Wordmark_Black.svg" alt="Hologram" width="172" height="16"><span class="hub">Models Hub</span></a>
   <div class="top-end">
     ${search ? `<form class="field compact top-search" action="${base}" role="search">${R.icon.search}<input type="search" name="q" placeholder="Search models" aria-label="Search models" autocomplete="off"></form>` : ""}
     <a class="status" href="${INDEX}" title="Addresses refresh daily">Index ${R.day(data.snapshot)}</a>
     <a class="github" href="${REPO}" aria-label="GitHub" title="GitHub">${R.icon.github}</a>
+    ${themeSwitch}
   </div>
 </header>
 ${body}

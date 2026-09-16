@@ -43,7 +43,7 @@ for (const f of ["Geist-Regular", "Geist-Medium", "GeistMono-Regular", "GeistMon
   await writeFile(join(OUT, "fonts", `${f}.woff2`), show(KIT_REV, `brand/fonts/web/${f}.woff2`, "buffer"));
 }
 for (const f of ["OFL.txt", "OFL-Archivo.txt"]) await writeFile(join(OUT, "fonts", f), show(KIT_REV, `brand/fonts/${f}`));
-for (const [dir, f] of [["logomark", "Hologram_Logomark_White"], ["lockup", "Hologram_Lockup_White"], ["wordmark", "Hologram_Wordmark_White"]]) {
+for (const [dir, f] of [["logomark", "Hologram_Logomark_White"], ["lockup", "Hologram_Lockup_White"], ["wordmark", "Hologram_Wordmark_White"], ["logomark", "Hologram_Logomark_Black"], ["wordmark", "Hologram_Wordmark_Black"]]) {
   await writeFile(join(OUT, "logos", `${f}.svg`), show(KIT_REV, `brand/logos/svg/${dir}/${f}.svg`));
 }
 await writeFile(join(OUT, "REV"), `develop ${KIT_REV}\npr-1 ${SUCCESS_REV}\n`);
