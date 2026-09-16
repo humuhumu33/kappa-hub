@@ -1,0 +1,10 @@
+/target
+**/*.rs.bk
+data/
+*.redb
+.env
+.envrc
+node_modules/
+dist/
+.DS_Store
+Thumbs.db
