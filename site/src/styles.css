@@ -197,11 +197,15 @@ ul { list-style: none; margin: 0; padding: 0; }
 .bar { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0 var(--space-6); }
 .bar .search { flex: 0 1 40%; min-width: 17.5rem; }
 .open-filters { display: none; }
+.results-head { position: relative; z-index: 5; }
 .sort { position: relative; margin-left: auto; }
 .sort > button { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); height: var(--hh-field); min-width: 11.25rem; padding: 0 var(--space-4); border: 1px solid var(--hh-line-strong); border-radius: var(--radius-md); transition: border-color var(--hh-ease); }
 .sort > button:hover, .sort > button[aria-expanded="true"] { border-color: var(--hh-line-focus); }
-.sort [role="listbox"] { position: absolute; right: 0; top: calc(100% + var(--space-2)); z-index: 20; min-width: 100%; padding: var(--space-1); background: var(--hh-popover); border: 1px solid var(--hh-line-strong); border-radius: var(--radius-md); box-shadow: 0 var(--space-4) var(--space-12) var(--hh-shadow); }
-.sort [role="option"] { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); height: var(--hh-control); padding: 0 var(--space-3); border-radius: var(--radius-sm); font-size: var(--text-sm); cursor: pointer; white-space: nowrap; }
+.sort > button .i { color: var(--hh-text-dim); transition: transform 200ms cubic-bezier(.2, .8, .2, 1); }
+.sort > button[aria-expanded="true"] .i { transform: rotate(180deg); }
+.sort [role="listbox"] { position: absolute; left: 0; right: 0; top: calc(100% + var(--space-2)); z-index: 20; padding: var(--space-1); transform-origin: top; animation: menu-in 160ms cubic-bezier(.2, .8, .2, 1); background: var(--hh-popover); border: 1px solid var(--hh-line-strong); border-radius: var(--radius-md); box-shadow: 0 var(--space-4) var(--space-12) var(--hh-shadow); }
+.sort [role="option"] { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); height: var(--hh-control); padding: 0 var(--space-3); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--hh-text-dim); cursor: pointer; white-space: nowrap; transition: background var(--hh-ease), color var(--hh-ease); }
+.sort [role="option"]:hover, .sort [role="option"].hot, .sort [role="option"][aria-selected="true"] { color: var(--hh-text); }
 .sort [role="option"]:hover, .sort [role="option"].hot { background: var(--hh-fill); }
 .sort [role="option"] .i { visibility: hidden; }
 .sort [role="option"][aria-selected="true"] .i { visibility: visible; }
