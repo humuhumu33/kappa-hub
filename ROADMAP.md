@@ -103,10 +103,40 @@ seams; the user sees `hologram hub get <repo>` and a progress bar.
 
 | Phase | Deliverable | Acceptance |
 |---|---|---|
-| M-S1 | Swarm transport behind the seams: `hub swarm serve/get`, direct BlobTicket round-trip | Two daemons exchange a multi-chunk model P2P; byte-identical; zero bytes over HTTP |
+| M-S1 ✅ **accepted 2026-09-16** | Swarm transport behind the seams: `hub swarm serve/get`, direct BlobTicket round-trip | Two daemons exchange a multi-chunk model P2P; byte-identical; zero bytes over HTTP |
 | M-S2 | Federated tracker: signed provider announcements as kappa edges/tags, TTL, re-announce, reverse-edge lookup | A leecher discovers a seeder via a node that never saw the seeder directly |
 | M-S3 | Parallel chunk fetcher: work-stealing across chunks and peers, failure budgets, resume | N-peer fetch ≥ max single-peer throughput and ≥ 80% of aggregate |
 | M-S4 | One-command UX: `hub get` / `hub share`, `kappahub:` links, license intent gating | New machine to running model in one command, no flags |
+
+M-S1 evidence (live, two hologram daemons on one machine, Iroh over mDNS +
+QUIC):
+
+- Daemon A: `swarm_share = true` — at startup it seeds its store's chunk
+  blobs by reference into an embedded Iroh node and writes its tickets to
+  `cache/swarm/tickets.txt`.
+- Daemon B: `[hub] swarm_tickets` (no `kappa_endpoint` configured at all).
+  After import, both weight-chunk blobs were deleted from B's local store;
+  `GET …/resolve/main/weights-a.bin` → **200 in 145 ms**, fetched over
+  Iroh from daemon A, byte-identical (SHA-256), chunk re-cached locally;
+  weights-b identical too.
+- Zero HTTP: the fetch path never touched a kappa node or Hugging Face.
+
+Three defects found and fixed on the way (each is a lesson for M-S2/M-S3):
+
+1. **Router dropped at spawn** — `let _router = …` shut the blob protocol
+   handler down while the endpoint kept accepting: connections connected,
+   no data ever flowed. Fixed by holding the router in `SwarmNode`.
+2. **Executor starvation** — the swarm thread blocked its tokio runtime in
+   a std-mpsc loop, starving Iroh's endpoint/relay tasks sharing that
+   executor. Fixed with a tokio unbounded channel and `recv().await`.
+3. **Unbounded fetch** — Iroh's downloader has no watchdog; a dead ticket
+   hung callers indefinitely. Fixed with a 60 s fetch timeout that
+   degrades to the HTTP ladder.
+
+Also added: `PDBMaxMB` workaround replaced by `debug =
+"line-tables-only"` (MSVC LNK1140 with wasmtime + iroh in one binary),
+`ImportMode::TryReference` seeding (no second copy on disk), fetched
+chunks are immediately served onward (the swarm grows with every fetch).
 
 ## M2 — Provenance
 
