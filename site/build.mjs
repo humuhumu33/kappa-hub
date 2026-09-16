@@ -43,11 +43,11 @@ ${STYLES.map((s) => `<link rel="stylesheet" href="${base}${s}">`).join("\n")}
 <body>
 <div class="shell">
 <header class="top">
-  <a class="brand" href="${base}" aria-label="Hologram Hub"><img src="${base}logos/Hologram_Lockup_White.svg" alt="Hologram" width="125" height="24"><span class="hub">Hub</span></a>
-  <nav class="nav" aria-label="Main"><a href="${base}">Models</a><a href="${REPO}">GitHub</a></nav>
+  <a class="brand" href="${base}" aria-label="Hologram Hub"><img class="mark" src="${base}logos/Hologram_Logomark_White.svg" alt="" width="32" height="32"><img class="word" src="${base}logos/Hologram_Wordmark_White.svg" alt="Hologram" width="172" height="16"><span class="hub">Hub</span></a>
   <div class="top-end">
     ${search ? `<form class="field compact top-search" action="${base}" role="search">${R.icon.search}<input type="search" name="q" placeholder="Search models" aria-label="Search models" autocomplete="off"></form>` : ""}
     <a class="status" href="${INDEX}" title="Addresses refresh daily">Index ${R.day(data.snapshot)}</a>
+    <a class="github" href="${REPO}" aria-label="GitHub" title="GitHub">${R.icon.github}</a>
   </div>
 </header>
 ${body}
