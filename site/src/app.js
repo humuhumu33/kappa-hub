@@ -8,10 +8,7 @@ if ($("[data-verify]")) model();
 copyButtons();
 
 async function browse() {
-  const [data, dots] = await Promise.all([
-    fetch(`${base}data/models.json`).then((r) => r.json()),
-    fetch(`${base}data/dots.json`).then((r) => r.json()),
-  ]);
+  const data = await fetch(`${base}data/models.json`).then((r) => r.json());
   const models = R.prepare(data.models, data.snapshot);
   let state = R.parseState(location.search);
   const filters = $("#filters-body"), grid = $("#grid"), pager = $("#pager"), total = $("#total"), q = $("#q");
@@ -23,7 +20,7 @@ async function browse() {
     state.page = r.page;
     const focus = document.activeElement?.dataset?.facetSearch;
     filters.innerHTML = R.filters(r, state, order);
-    grid.innerHTML = R.grid(r, { base, dots });
+    grid.innerHTML = R.grid(r, { base });
     pager.innerHTML = R.pager(r, state);
     total.textContent = r.results.length.toLocaleString("en-US");
     $("#sheet-count").textContent = total.textContent;

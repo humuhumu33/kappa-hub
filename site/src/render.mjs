@@ -114,14 +114,29 @@ export const icon = {
   sortCount: I('<path d="M4 8h3M4 12h6M4 16h9M17 5v14m-3-3 3 3 3-3"/>'),
 };
 
-// The Hologram mark's 70 dots, lit by the model's own address: same bytes, same pattern.
-// Opacity here is relative; the strip's overall strength is a CSS token.
-export function art(dots, seed, lit) {
+// Faceted mesh seeded by the model's own address: same bytes, same surface.
+// Facets are lit only for addressed models; queued and gated models show the bare wireframe.
+const ART_W = 260, ART_H = 120;
+export function art(seed, lit) {
   let h = 2166136261;
   for (const c of String(seed)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
-  const rand = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1000) / 1000; };
-  const circles = dots.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" opacity="${lit ? (0.3 + rand() * 0.7).toFixed(2) : "0.35"}"/>`).join("");
-  return `<svg class="art${lit ? " lit" : ""}" viewBox="-104 -104 208 208" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">${circles}</svg>`;
+  const r = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; };
+  const f = (n) => n.toFixed(1);
+  const cols = 9, rows = 4, gx = ART_W / (cols - 1), gy = ART_H / (rows - 1), p = [];
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    p.push([x * gx + (r() - 0.5) * gx * 0.5, y * gy + (y && y < rows - 1 ? (r() - 0.5) * gy * 0.5 : 0)]);
+  }
+  let edges = "", faces = "";
+  for (let y = 0; y < rows - 1; y++) for (let x = 0; x < cols - 1; x++) {
+    const a = p[y * cols + x], b = p[y * cols + x + 1], c = p[(y + 1) * cols + x], d = p[(y + 1) * cols + x + 1];
+    for (const t of [[a, b, d], [a, d, c]]) {
+      const path = `M${t.map((q) => `${f(q[0])} ${f(q[1])}`).join("L")}Z`;
+      edges += path;
+      const v = r();
+      if (lit && v < 0.35) faces += `<path d="${path}" opacity="${f(0.02 + v * 0.12)}"/>`;
+    }
+  }
+  return `<svg class="art${lit ? " lit" : ""}" viewBox="0 0 ${ART_W} ${ART_H}" preserveAspectRatio="xMaxYMid slice" aria-hidden="true"><g class="facets">${faces}</g><path class="edges" d="${edges}"/></svg>`;
 }
 
 export function avatar(m, base, cls = "avatar") {
@@ -148,9 +163,9 @@ export function meta(m) {
   return parts.map((p) => `<span>${p}</span>`).join('<span class="sep" aria-hidden="true">·</span>');
 }
 
-export function card(m, { base, dots }) {
+export function card(m, { base }) {
   return `<a class="card" href="${base}models/${esc(m.id)}/" title="${esc(m.id)}">
-  ${art(dots, m.manifest || m.id, m.state === "addressed")}
+  ${art(m.manifest || m.id, m.state === "addressed")}
   <span class="tags">${tags(m)}</span>
   <span class="title">${esc(m.name)}</span>
   <span class="meta">${meta(m)}</span>
@@ -264,9 +279,9 @@ export function filters(r, state, order = {}) {
   return `<div class="tabs" role="tablist">${tabs}</div><div class="sections">${sections}</div>`;
 }
 
-export function grid(r, { base, dots }) {
+export function grid(r, { base }) {
   if (!r.results.length) return `<div class="empty"><p>No models match these filters.</p><button type="button" class="link" data-clear>Clear filters</button></div>`;
-  return r.slice.map((m) => card(m, { base, dots })).join("");
+  return r.slice.map((m) => card(m, { base })).join("");
 }
 
 export function pager(r, state) {

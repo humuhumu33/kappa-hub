@@ -18,9 +18,6 @@ const INDEX = "https://github.com/humuhumu33/hologram-api";
 
 const data = JSON.parse(await readFile(join(SITE, "data", "models.json"), "utf8"));
 const models = R.prepare(data.models, data.snapshot);
-const logomark = await readFile(join(KIT, "logos", "Hologram_Logomark_White.svg"), "utf8");
-const dots = [...logomark.matchAll(/cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)"/g)].map((m) => m.slice(1).map(Number));
-if (dots.length !== 70) throw new Error(`expected 70 dots in the logomark, found ${dots.length}`);
 
 const STYLES = ["kit/hologram-warm.css", "kit/hologram-gap-tokens.css", "tokens.css", "styles.css"];
 
@@ -79,7 +76,7 @@ const browse = page({
         <ul role="listbox" id="sort-list" aria-label="Sort" hidden>${sortMenu}</ul>
       </div>
     </div>
-    <div class="grid" id="grid">${R.grid(r, { base, dots })}</div>
+    <div class="grid" id="grid">${R.grid(r, { base })}</div>
     <nav class="pager" id="pager" aria-label="Pages">${R.pager(r, initial)}</nav>
   </section>
 </main>`,
@@ -168,7 +165,6 @@ for (const m of models) {
 
 const slim = models.map(({ stateLabel, task, recency, isNew, ...m }) => m);
 await writeFile(join(DIST, "data", "models.json"), JSON.stringify({ snapshot: data.snapshot, models: slim }));
-await writeFile(join(DIST, "data", "dots.json"), JSON.stringify(dots));
 for (const f of ["app.js", "render.mjs", "styles.css", "tokens.css"]) await cp(join(SITE, "src", f), join(DIST, f));
 await mkdir(join(DIST, "kit"), { recursive: true });
 for (const f of ["hologram-warm.css", "hologram-gap-tokens.css"]) await cp(join(KIT, f), join(DIST, "kit", f));
