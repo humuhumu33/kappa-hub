@@ -43,7 +43,7 @@ ${STYLES.map((s) => `<link rel="stylesheet" href="${base}${s}">`).join("\n")}
 <body>
 <div class="shell">
 <header class="top">
-  <a class="brand" href="${base}" aria-label="Hologram Hub"><img class="mark" src="${base}logos/Hologram_Logomark_White.svg" alt="" width="32" height="32"><img class="word" src="${base}logos/Hologram_Wordmark_White.svg" alt="Hologram" width="172" height="16"><span class="hub">Hub</span></a>
+  <a class="brand" href="${base}" aria-label="Hologram Models Hub"><img class="mark" src="${base}logos/Hologram_Logomark_White.svg" alt="" width="32" height="32"><img class="word" src="${base}logos/Hologram_Wordmark_White.svg" alt="Hologram" width="172" height="16"><span class="hub">Models Hub</span></a>
   <div class="top-end">
     ${search ? `<form class="field compact top-search" action="${base}" role="search">${R.icon.search}<input type="search" name="q" placeholder="Search models" aria-label="Search models" autocomplete="off"></form>` : ""}
     <a class="status" href="${INDEX}" title="Addresses refresh daily">Index ${R.day(data.snapshot)}</a>
@@ -122,7 +122,7 @@ function modelPage(m, files) {
   }
 
   return page({
-    title: `${m.name} · Hologram Hub`,
+    title: `${m.name} · Hologram Models Hub`,
     description: `${m.id}: every file of this model with the address that proves its bytes.`,
     search: true,
     body: `<a class="back" href="${base}">${R.icon.left}Models</a>
@@ -152,7 +152,7 @@ await rm(DIST, { recursive: true, force: true });
 await mkdir(join(DIST, "data"), { recursive: true });
 await writeFile(join(DIST, "index.html"), browse);
 await writeFile(join(DIST, "404.html"), page({
-  title: "Not found · Hologram Hub",
+  title: "Not found · Hologram Models Hub",
   description: "Page not found.",
   search: true,
   body: `<section class="panel browse"><div class="empty"><p>This page does not exist.</p><a class="link" href="${base}">All models</a></div></section>`,
