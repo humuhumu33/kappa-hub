@@ -242,7 +242,33 @@ Network effect, restated: more seeders = more capacity; more kappa nodes =
 more rendezvous and mirrors; more Veilid nodes = more overlay resilience.
 Every participant improves discovery, availability, and bandwidth at once.
 
-## 8. Non-goals
+## 8. Positioning: the storage layer (kappa vs BlueStore)
+
+Kappa-registry aims to replace Ceph's BlueStore while keeping S3
+compatibility. The placement clarifies this system's layers:
+
+- **Ceph analogy**: MON ↔ kappa identity/federation (the map); OSD/BlueStore
+  ↔ kappa substrate (blob files + redb metadata + ingest verification +
+  RBSR replication); RGW ↔ kappa S3 module (SigV4, multipart, versioning,
+  lifecycle — already implemented).
+- **Integrity**: BlueStore checks per-block CRC32; kappa content-addresses
+  every blob with BLAKE3 and re-hashes on read — the address is the
+  checksum, which is strictly stronger.
+- **Dedup**: BlueStore thin-clones approximate sharing inside one cluster;
+  content addressing shares identical chunks across every node and every
+  model revision, globally.
+- **The new property Ceph never had**: storage and distribution unify. A
+  kappa node holding a chunk is a legitimate swarm seeder of it
+  (`swarm_share`), and can serve-through chunks it does not hold by pulling
+  from the mesh. A model's lifecycle: written via S3 or the hub API →
+  chunks land content-addressed → the swarm distributes peer-to-peer → any
+  S3 client reads them from any node.
+- **Honest gaps on that road**: block-device semantics (RBD) are out of
+  scope — this replaces BlueStore-the-object-layer, not RBD; compression at
+  rest is a gap (delta bundles exist only in transit); S3 auth rides
+  bearer/SigV4 rather than capability edges — unifying them is real work.
+
+## 9. Non-goals
 
 No BitTorrent transport in v1 (Iroh covers the need; two swarms split the
 mesh). No DHT content routing before the federation proves insufficient. No
