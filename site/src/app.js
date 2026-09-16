@@ -214,7 +214,7 @@ function themeSwitch() {
   function sync() {
     const mode = root.dataset.theme, wall = root.dataset.wallpaper;
     for (const b of menu.querySelectorAll("[data-theme-mode]")) b.setAttribute("aria-checked", String(b.dataset.themeMode === mode));
-    for (const b of menu.querySelectorAll("[data-wallpaper]")) b.setAttribute("aria-checked", String(mode === "immersive" && b.dataset.wallpaper === wall));
+    for (const b of menu.querySelectorAll("button.wall")) b.setAttribute("aria-checked", String(mode === "immersive" && b.dataset.wallpaper === wall));
     const w = walls.find((x) => x.key === wall);
     $("#walls").classList.toggle("on", mode === "immersive");
     $("#wall-credit").innerHTML = w ? `${w.name}, photo by <a href="${w.url}" target="_blank" rel="noopener">${w.by}</a> on Unsplash` : "";
@@ -249,9 +249,9 @@ function themeSwitch() {
   button.addEventListener("click", (e) => { e.stopPropagation(); open(menu.hidden, e.detail === 0); });
   button.addEventListener("pointerenter", warm, { once: true });
   menu.addEventListener("click", (e) => {
-    const mode = e.target.closest("[data-theme-mode]"), wall = e.target.closest("[data-wallpaper]");
+    const mode = e.target.closest("button[data-theme-mode]"), wall = e.target.closest("button.wall");
     if (mode) apply(mode.dataset.themeMode);
-    if (wall) apply("immersive", wall.dataset.wallpaper);
+    else if (wall) apply("immersive", wall.dataset.wallpaper);
   });
   menu.addEventListener("keydown", (e) => {
     const list = items(), i = list.indexOf(document.activeElement);
